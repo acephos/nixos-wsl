@@ -56,6 +56,9 @@ let
     # Manually kick the backup timer's service once
     nsync = "sudo systemctl start nixos-wsl-auto-sync.service && journalctl -u nixos-wsl-auto-sync.service -n 40 --no-pager";
     nsync-status = "systemctl status nixos-wsl-auto-sync.timer nixos-wsl-auto-sync.service --no-pager";
+    # Bump herdr + pi to latest, rebuild if flake.lock changed, push
+    nup = "~/nixos-wsl/scripts/update-agents.sh && ~/nixos-wsl/scripts/rebuild.sh switch";
+    nup-agents = "~/nixos-wsl/scripts/update-agents.sh";
     nix-search = "nix search nixpkgs";
   };
 in
@@ -74,11 +77,13 @@ in
     enable = true;
     interval = "4h";
     onBoot = "30min";
-    # false = full rebuild heartbeat every interval (what you asked for)
+    # false = full rebuild heartbeat every interval
     # true  = only when git is dirty / unpushed (lighter)
     onlyWhenDirty = false;
-    # true would run `nix flake update` unattended — leave off unless you want that
+    # Do NOT auto-bump nixpkgs/nixos-wsl — keep the base OS pinned
     updateFlake = false;
+    # DO auto-bump fast-moving agents every tick: herdr (flake) + pi (npm latest)
+    updateAgents = true;
     push = true;
   };
 

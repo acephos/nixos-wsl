@@ -191,6 +191,14 @@ else
   fi
 fi
 
+# pi tracks npm latest (not a Nix package) — install after node is on PATH
+if [[ -x "$REPO/scripts/update-agents.sh" ]]; then
+  log "installing/updating agent CLIs (herdr via flake already; pi via npm)"
+  # PATH may not have new system profile yet in this shell
+  export PATH="/run/current-system/sw/bin:$HOME/.local/bin:$PATH"
+  "$REPO/scripts/update-agents.sh" --pi-only || warn "pi install failed — run: nup-agents later"
+fi
+
 # ---------------------------------------------------------------------------
 # Done
 # ---------------------------------------------------------------------------

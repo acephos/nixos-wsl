@@ -1,0 +1,8 @@
+{
+  "pi": "0.81.1",
+  "piPackage": "@earendil-works/pi-coding-agent",
+  "herdr": "e7fc85bfdb51f89488430adbfe5bbced3be79c2f",
+  "herdrInput": "github:ogulcancelik/herdr",
+  "updatedAt": "2026-07-23T11:37:59Z",
+  "updatedOn": "nixos"
+}

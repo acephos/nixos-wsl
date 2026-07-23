@@ -58,7 +58,18 @@ in
       default = false;
       description = ''
         If true, run `nix flake update` before rebuild (bumps nixpkgs etc.).
-        Off by default — auto-updating inputs can surprise you.
+        Off by default — auto-updating nixpkgs can surprise you.
+      '';
+    };
+
+    updateAgents = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = ''
+        If true, before each sync run `scripts/update-agents.sh`:
+          - herdr: `nix flake update herdr` (system package)
+          - pi:    `npm i -g @earendil-works/pi-coding-agent@latest` (~/.local)
+        nixpkgs / nixos-wsl stay pinned. Records versions in agents.lock.json.
       '';
     };
 
@@ -90,6 +101,8 @@ in
         pkgs.gnugrep
         pkgs.gawk
         pkgs.util-linux # flock
+        pkgs.jq
+        pkgs.nodejs # npm for pi
       ];
       environment = {
         HOME = home;
@@ -99,7 +112,9 @@ in
         NIXOS_AUTO_COMMIT = "1";
         NIXOS_AUTO_SYNC_ONLY_DIRTY = if cfg.onlyWhenDirty then "1" else "0";
         NIXOS_AUTO_SYNC_UPDATE_FLAKE = if cfg.updateFlake then "1" else "0";
-        # gh / git
+        NIXOS_AUTO_SYNC_UPDATE_AGENTS = if cfg.updateAgents then "1" else "0";
+        npm_config_prefix = "${home}/.local";
+        # gh / git / npm
         XDG_CONFIG_HOME = "${home}/.config";
         XDG_DATA_HOME = "${home}/.local/share";
         GIT_TERMINAL_PROMPT = "0";

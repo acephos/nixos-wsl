@@ -139,14 +139,27 @@ nixosWsl.autoSync = {
   interval = "4h";       # "30min", "6h", "1d", …
   onBoot = "30min";
   onlyWhenDirty = false; # true = skip when clean+pushed
-  updateFlake = false;   # true = also `nix flake update` (risky)
+  updateFlake = false;   # keep nixpkgs pinned
+  updateAgents = true;   # herdr (flake) + pi (npm @latest) every tick
   push = true;
 };
 ```
 
+**Always-latest agents** (herdr + pi), base OS stays pinned:
+
+| Tool | Channel | How it updates |
+|------|---------|----------------|
+| `herdr` | flake input | `nix flake update herdr` on each timer / `nup` |
+| `pi` | npm `@latest` → `~/.local` | `npm i -g …@latest` on each timer / `nup` |
+| nixpkgs | `flake.lock` | only when you run `nfu` / set `updateFlake` |
+
+Versions last resolved are recorded in [`agents.lock.json`](./agents.lock.json).
+
 ```bash
+nup              # update herdr+pi now, rebuild, push
+nup-agents       # update only (no rebuild)
 nsync-status
-nsync                                          # one-shot now + logs
+nsync            # full timer job once + logs
 journalctl -u nixos-wsl-auto-sync.service -n 50
 ```
 
@@ -176,6 +189,8 @@ flake.nix                 # inputs + nixosConfigurations.nixos
 flake.lock                # THE pin — commit this always
 configuration.nix         # full system config + autoSync interval
 modules/auto-sync.nix     # systemd timer options
+scripts/install.ps1       # Windows: WSL + NixOS-WSL + bootstrap
+scripts/bootstrap.sh      # inside NixOS: prereqs + known-good + switch
 scripts/rebuild.sh        # nrs backend
 scripts/auto-sync.sh      # timer backend
 scripts/checkpoint.sh     # ngood backend
