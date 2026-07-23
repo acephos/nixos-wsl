@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Reminder when hooks path isn't set after clone (no-op otherwise).
+set -euo pipefail
+exit 0

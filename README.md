@@ -67,10 +67,11 @@ sudo nix-env -iA nixos.git   # or use the image's git
 
 git clone https://github.com/acephos/nixos-wsl.git ~/nixos-wsl
 cd ~/nixos-wsl
+./scripts/install-hooks.sh   # enable repo git hooks
 
 # optional: fork? set your username in flake.nix (username / hostName)
 
-sudo nixos-rebuild switch --flake .#nixos
+./scripts/rebuild.sh switch  # or after first switch: nrs
 ```
 
 Log out / open a new shell. You should be on zsh with the full toolset.
@@ -100,26 +101,56 @@ Repo lives at `~/nixos-wsl` (aliases assume that path).
 
 | Command | What it does |
 |---------|----------------|
-| `nrs` / `rebuild` | `nixos-rebuild switch` this flake |
-| `nrt` | test rebuild (no boot entry) |
-| `nrf` | switch + refresh flake inputs from network |
-| `nfu` | `nix flake update` then switch |
+| `nrs` / `rebuild` | switch **and** on success: commit → tag `known-good` → push |
+| `nrt` | test rebuild only (no commit/push) |
+| `nrf` | switch + `--refresh` flake inputs |
+| `nfu` | `nix flake update` then `nrs` |
+| `ngood [msg]` | checkpoint git **without** rebuilding (before experiments) |
+| `nlist` | list system generations |
+| `nroll` | `nixos-rebuild switch --rollback` |
 | `ns <pkg>` | ephemeral `nix shell nixpkgs#<pkg>` |
 
 Edit `configuration.nix` → `nrs`.
 
+### Git automation (what runs when)
+
+**Nothing is on a timer.** The remote updates only when you rebuild (or checkpoint).
+
+| Event | Commit? | Tag `known-good`? | Push? |
+|-------|---------|-------------------|-------|
+| `nrs` success | yes, if tree dirty | yes (moved to HEAD) | yes (default) |
+| `nrs --no-push` | yes | yes | no |
+| `ngood "before X"` | yes, if dirty | yes | yes (default) |
+| failed rebuild | **no** | **no** | **no** |
+| plain `git commit` | your call | no | no |
+
+Disable push for one shot or forever:
+
+```bash
+nrs --no-push
+export NIXOS_AUTO_PUSH=0    # session default off
+```
+
+Git hooks (enable once per clone: `./scripts/install-hooks.sh`):
+
+- `githooks/pre-commit` — refuse secret-looking files; require `flake.lock` with `flake.nix`; parse-check staged `*.nix`
+
+There is **no** cron/systemd timer. Frequency = how often you run `nrs`.
+
 ### Updating the world
 
 ```bash
-cd ~/nixos-wsl
-nix flake update          # bumps nixpkgs / nixos-wsl / herdr in flake.lock
-git diff flake.lock       # review
-nrs                       # build + activate
-git add -A && git commit -m "flake: update inputs"
-git push
+nfu                       # flake update + rebuild + commit + push
+# or step by step:
+cd ~/nixos-wsl && nix flake update && nrs
 ```
 
-Other machines: `git pull && nrs` → same generations.
+Other machines: `git pull && nrs` → same closure (from `flake.lock`).
+
+Rollback map:
+
+- **OS packages/services:** `nroll` or `nlist` + switch-generation
+- **Config files:** `git checkout known-good` (or an older commit) then `nrs`
 
 ## Repo layout
 
@@ -127,6 +158,10 @@ Other machines: `git pull && nrs` → same generations.
 flake.nix              # inputs + nixosConfigurations.nixos
 flake.lock             # THE pin — commit this always
 configuration.nix      # full system config (packages, shell, services)
+scripts/rebuild.sh     # nrs backend: switch + checkpoint + push
+scripts/checkpoint.sh  # ngood backend
+scripts/install-hooks.sh
+githooks/pre-commit    # secret/lockfile/syntax guards
 templates/devshell/    # copy into projects + direnv
 ```
 

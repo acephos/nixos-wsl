@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Block commits that would brick reproducibility or leak secrets.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+# Must keep the lockfile when flake inputs change
+if git diff --cached --name-only | grep -qx 'flake.nix'; then
+  if ! git diff --cached --name-only | grep -qx 'flake.lock'; then
+    if [[ -f flake.lock ]] && ! git diff --name-only flake.lock | grep -q .; then
+      : # lock unchanged on disk — ok
+    else
+      echo "pre-commit: flake.nix staged but flake.lock is missing/unstaged." >&2
+      echo "  Run:  nix flake lock && git add flake.lock" >&2
+      exit 1
+    fi
+  fi
+fi
+
+# Refuse private key material
+if git diff --cached --name-only | grep -E '(^|/)\.env$|\.pem$|\.key$|id_rsa|id_ed25519|secrets\.yaml$' >/dev/null; then
+  echo "pre-commit: refusing to commit secret-looking paths:" >&2
+  git diff --cached --name-only | grep -E '(^|/)\.env$|\.pem$|\.key$|id_rsa|id_ed25519|secrets\.yaml$' >&2
+  exit 1
+fi
+
+# Fast syntax check on staged nix files (no full eval — that needs network sometimes)
+if command -v nix-instantiate >/dev/null 2>&1; then
+  while IFS= read -r f; do
+    [[ -z "$f" || ! -f "$f" ]] && continue
+    # parse-only check
+    if ! nix-instantiate --parse "$f" >/dev/null 2>&1; then
+      echo "pre-commit: nix parse failed: $f" >&2
+      nix-instantiate --parse "$f" >/dev/null || true
+      exit 1
+    fi
+  done < <(git diff --cached --name-only --diff-filter=ACMR | grep '\.nix$' || true)
+fi
+
+exit 0

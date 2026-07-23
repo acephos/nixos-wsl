@@ -40,12 +40,17 @@ let
     dc = "docker compose";
     dps = "docker ps";
     # NixOS (flake-aware — repo lives at ~/nixos-wsl)
-    rebuild = "sudo nixos-rebuild switch --flake ~/nixos-wsl#nixos";
-    nrs = "sudo nixos-rebuild switch --flake ~/nixos-wsl#nixos";
-    nrb = "sudo nixos-rebuild boot --flake ~/nixos-wsl#nixos";
-    nrt = "sudo nixos-rebuild test --flake ~/nixos-wsl#nixos";
-    nrf = "sudo nixos-rebuild switch --flake ~/nixos-wsl#nixos --refresh";
-    nfu = "cd ~/nixos-wsl && nix flake update && sudo nixos-rebuild switch --flake .#nixos";
+    # nrs/rebuild: switch + on success auto-commit, tag known-good, push
+    rebuild = "~/nixos-wsl/scripts/rebuild.sh switch";
+    nrs = "~/nixos-wsl/scripts/rebuild.sh switch";
+    nrb = "~/nixos-wsl/scripts/rebuild.sh boot";
+    nrt = "~/nixos-wsl/scripts/rebuild.sh test --no-commit --no-push";
+    nrf = "~/nixos-wsl/scripts/rebuild.sh switch -- --refresh";
+    nfu = "cd ~/nixos-wsl && nix flake update && ~/nixos-wsl/scripts/rebuild.sh switch";
+    # Checkpoint current files as known-good without rebuilding (before experiments)
+    ngood = "~/nixos-wsl/scripts/checkpoint.sh";
+    nlist = "sudo nix-env --list-generations -p /nix/var/nix/profiles/system";
+    nroll = "sudo nixos-rebuild switch --rollback";
     nix-search = "nix search nixpkgs";
   };
 in
