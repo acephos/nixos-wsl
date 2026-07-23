@@ -154,6 +154,7 @@ nixosWsl.autoSync = {
 |------|---------|----------------|
 | `herdr` | flake input | `nix flake update herdr` on each timer / `nup` |
 | `pi` | npm `@latest` → `~/.local` | `npm i -g …@latest` on each timer / `nup` |
+| pi extensions | `home/pi/settings.json` | `pi install` each package + `pi update --extensions` on `nup` |
 | nixpkgs | `flake.lock` | only when you run `nfu` / set `updateFlake` |
 
 Versions last resolved are recorded in [`agents.lock.json`](./agents.lock.json).
@@ -195,6 +196,7 @@ modules/
   wsl.nix  nix.nix  packages.nix  shell.nix  dev.nix
   auto-sync.nix  notify.nix  secrets.nix  home.nix
 home/default.nix          # Home Manager user files
+home/pi/settings.json     # pi prefs + extension package list (OOBE)
 secrets/secrets.yaml      # sops-encrypted (age)
 docs/SECRETS.md  docs/RESTORE.md
 scripts/                  # bootstrap, rebuild, nup, ndrill, …
@@ -233,6 +235,7 @@ templates/devshell/
 | `git config user.*` | set in `home/default.nix` if you want it shared |
 | `rustup` toolchains | `rustup default stable` |
 | pi binary | npm `~/.local` (version in `agents.lock.json`) |
+| pi settings/extensions | `home/pi/settings.json` → `~/.pi/agent/settings.json` |
 | Docker volumes | runtime data |
 | Windows side | host OS |
 

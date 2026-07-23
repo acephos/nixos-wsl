@@ -1,0 +1,39 @@
+{
+  "theme": "dark",
+  "defaultProvider": "xai",
+  "defaultModel": "grok-4.5",
+  "defaultThinkingLevel": "high",
+  "showHardwareCursor": false,
+  "terminal": {
+    "clearOnShrink": true,
+    "showTerminalProgress": true
+  },
+  "steeringMode": "all",
+  "transport": "auto",
+  "hideThinkingBlock": false,
+  "showCacheMissNotices": true,
+  "collapseChangelog": true,
+  "quietStartup": true,
+  "defaultProjectTrust": "always",
+  "doubleEscapeAction": "tree",
+  "treeFilterMode": "user-only",
+  "warnings": {
+    "anthropicExtraUsage": false
+  },
+  "packages": [
+    "npm:@reddb-io/red-skills-memory",
+    "npm:@vigolium/piolium",
+    "npm:@tintinweb/pi-subagents",
+    "npm:@dietrichgebert/ponytail",
+    "npm:@quintinshaw/pi-dynamic-workflows",
+    "npm:@ff-labs/pi-fff",
+    "npm:@juicesharp/rpiv-todo",
+    "npm:@narumitw/pi-goal",
+    "npm:@hypabolic/pi-hypa",
+    "npm:pi-agent-browser-native",
+    "npm:pi-prompt-template-model",
+    "npm:glimpseui",
+    "npm:pi-web-access",
+    "npm:@xaccefy/pi-xpi"
+  ]
+}

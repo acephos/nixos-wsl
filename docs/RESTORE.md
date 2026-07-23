@@ -9,8 +9,10 @@ Goal: **wipe the distro and be productive again in ~20–30 minutes**
 |------|--------|
 | OS packages, services, zsh, docker | `modules/*.nix` |
 | User dotfiles (npmrc, zshrc stub) | `home/default.nix` |
+| pi settings + extension list | `home/pi/settings.json` (HM symlink → `~/.pi/agent/settings.json`) |
 | herdr pin | `flake.lock` (+ auto `nup`) |
 | pi version record | `agents.lock.json` (binary via npm on bootstrap) |
+| pi extension packages | installed by `update-agents.sh` from settings `packages` |
 | Encrypted secrets ciphertext | `secrets/secrets.yaml` |
 | Install path | `scripts/bootstrap.sh` / `install.ps1` |
 
@@ -25,6 +27,7 @@ Goal: **wipe the distro and be productive again in ~20–30 minutes**
 | git user.name / email | memory / HM config | edit `home/default.nix` or `git config` |
 | Docker volumes / DB data | backups if needed | re-create |
 | Project working trees | git remotes | `git clone` |
+| pi `auth.json` / sessions | secrets + runtime | API keys via sops `agent-env`; sessions ephemeral |
 
 ## Age key (critical)
 

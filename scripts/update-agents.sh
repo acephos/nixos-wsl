@@ -81,6 +81,50 @@ if [[ "$DO_HUNK" -eq 1 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# pi packages from ~/.pi/agent/settings.json (or repo copy pre-HM)
+# ---------------------------------------------------------------------------
+ensure_pi_packages() {
+  command -v pi >/dev/null 2>&1 || { log "pi not on PATH — skip packages"; return 0; }
+  command -v jq >/dev/null 2>&1 || { log "jq missing — skip pi packages"; return 0; }
+
+  local settings=""
+  if [[ -f "$HOME/.pi/agent/settings.json" ]]; then
+    settings="$HOME/.pi/agent/settings.json"
+  elif [[ -f "$REPO/home/pi/settings.json" ]]; then
+    mkdir -p "$HOME/.pi/agent"
+    settings="$REPO/home/pi/settings.json"
+    # bootstrap race: HM not applied yet — point at repo file once
+    if [[ ! -e "$HOME/.pi/agent/settings.json" ]]; then
+      ln -sfn "$settings" "$HOME/.pi/agent/settings.json"
+      log "linked $HOME/.pi/agent/settings.json → $settings"
+    fi
+  else
+    log "no pi settings.json — skip packages"
+    return 0
+  fi
+
+  local pkg count=0 fail=0
+  while IFS= read -r pkg; do
+    [[ -z "$pkg" || "$pkg" == "null" ]] && continue
+    count=$((count + 1))
+    # pi install is idempotent when already present; installs missing npm trees
+    if pi install "$pkg" --no-approve >/dev/null 2>&1 || pi install "$pkg" >/dev/null 2>&1; then
+      :
+    else
+      log "warn: pi install failed: $pkg"
+      fail=$((fail + 1))
+    fi
+  done < <(jq -r '.packages[]? // empty' "$settings")
+
+  log "pi packages ensured: $count (failures=$fail)"
+  if pi update --extensions >/dev/null 2>&1; then
+    log "pi extensions updated"
+  else
+    log "pi update --extensions skipped/failed (non-fatal)"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # pi — always latest from npm into ~/.local
 # ---------------------------------------------------------------------------
 if [[ "$DO_PI" -eq 1 ]]; then
@@ -119,6 +163,10 @@ if [[ "$DO_PI" -eq 1 ]]; then
     *":$npm_config_prefix/bin:"*) ;;
     *) export PATH="$npm_config_prefix/bin:$PATH" ;;
   esac
+
+  # Install packages listed in settings.json (managed under home/pi/).
+  # Fresh machine: settings symlink lands via HM before this runs in bootstrap.
+  ensure_pi_packages
 fi
 
 # ---------------------------------------------------------------------------

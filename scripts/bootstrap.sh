@@ -222,6 +222,7 @@ cat <<EOF
 ║    gh auth login
 ║    gh auth setup-git
 ║    nrs                  # enable auto push after gh auth
+║    # pi settings+extensions: home/pi/settings.json (via HM + nup-agents)
 ║
 ║  Timer status:
 ║    nsync-status

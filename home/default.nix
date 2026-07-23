@@ -31,6 +31,12 @@
     cache=${config.home.homeDirectory}/.npm
   '';
 
+  # pi agent settings + extension package list (source of truth in this repo).
+  # Out-of-store symlink so `pi install`/`pi remove` can still write the file,
+  # and those edits land in git for the next nrs/nsync commit.
+  home.file.".pi/agent/settings.json".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nixos-wsl/home/pi/settings.json";
+
   # Lightweight zshrc — system owns aliases/prompt in /etc/zshrc
   home.file.".zshrc".text = ''
     # nixos-wsl managed (home-manager)
