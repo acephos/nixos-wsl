@@ -7,6 +7,26 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Fast lane — syntax / flake surface only
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: flake show
+        run: nix flake show
+
+      - name: scripts syntax
+        run: |
+          for s in scripts/*.sh; do
+            bash -n "$s"
+            echo "ok $s"
+          done
+
+  # Slow lane — one full system build (not also flake check; same derivation)
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -15,26 +35,11 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@v16
 
-      # magic-nix-cache is EOL / FlakeHub-auth noisy; GH cache is enough for this repo
       - uses: nix-community/cache-nix-action@v6
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
           gc-max-store-size: 5G
 
-      - name: flake show
-        # --all-systems is a boolean flag; do NOT pass a bare "false" (nix treats it as a flake URL)
-        run: nix flake show
-
       - name: build nixos system closure
         run: nix build .#nixos --print-build-logs
-
-      - name: flake check
-        run: nix flake check --print-build-logs
-
-      - name: scripts syntax
-        run: |
-          for s in scripts/*.sh; do
-            bash -n "$s"
-            echo "ok $s"
-          done
