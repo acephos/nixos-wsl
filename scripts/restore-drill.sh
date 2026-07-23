@@ -50,7 +50,7 @@ git config --global user.email >/dev/null 2>&1 && pass "git user.email set" || s
 command -v rustup >/dev/null && rustup show active-toolchain >/dev/null 2>&1 && pass "rustup toolchain active" || soft "rustup default stable not set"
 command -v pi >/dev/null && pass "pi on PATH ($(pi --version 2>/dev/null | head -1))" || soft "pi missing (nup-agents)"
 command -v herdr >/dev/null && pass "herdr on PATH" || soft "herdr missing (nrs after agents update)"
-[[ -r "$HOME/.config/nixos-wsl/agent-env" ]] && pass "agent-env present" || soft "no agent-env (optional API keys)"
+[[ -r /run/secrets/agent-env ]] && pass "agent-env present (/run/secrets)" || soft "no agent-env yet (edit: sops secrets/secrets.yaml)"
 [[ -d "$HOME/.ssh" ]] && pass "~/.ssh exists" || soft "no ~/.ssh"
 systemctl is-active nixos-wsl-auto-sync.timer >/dev/null 2>&1 && pass "auto-sync timer active" || soft "auto-sync timer inactive"
 

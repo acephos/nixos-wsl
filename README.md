@@ -22,7 +22,9 @@ Windows 11 + WSL2
 |-------|--------|------|
 | `nixpkgs` | `NixOS/nixpkgs` @ exact rev | All system packages |
 | `nixos-wsl` | `nix-community/NixOS-WSL` `release-26.05` | WSL integration module |
-| `herdr` | `ogulcancelik/herdr` | Agent multiplexer |
+| `home-manager` | `release-26.05` | User dotfiles |
+| `sops-nix` | `Mic92/sops-nix` | Encrypted secrets |
+| `herdr` | `ogulcancelik/herdr` | Agent multiplexer (auto-updated) |
 
 The lockfile is the contract. Two machines on the same `flake.lock` evaluate to
 the same store paths (for a given system, currently `x86_64-linux`).
@@ -187,14 +189,15 @@ Rollback map:
 ```
 flake.nix                 # inputs + nixosConfigurations.nixos
 flake.lock                # THE pin — commit this always
-configuration.nix         # full system config + autoSync interval
-modules/auto-sync.nix     # systemd timer options
-scripts/install.ps1       # Windows: WSL + NixOS-WSL + bootstrap
-scripts/bootstrap.sh      # inside NixOS: prereqs + known-good + switch
-scripts/rebuild.sh        # nrs backend
-scripts/auto-sync.sh      # timer backend
-scripts/checkpoint.sh     # ngood backend
-githooks/pre-commit
+configuration.nix         # thin knobs (autoSync / notify)
+modules/
+  wsl.nix  nix.nix  packages.nix  shell.nix  dev.nix
+  auto-sync.nix  notify.nix  secrets.nix  home.nix
+home/default.nix          # Home Manager user files
+secrets/secrets.yaml      # sops-encrypted (age)
+docs/SECRETS.md  docs/RESTORE.md
+scripts/                  # bootstrap, rebuild, nup, ndrill, …
+.github/workflows/ci.yml  # nix build + flake check
 templates/devshell/
 ```
 
@@ -208,18 +211,31 @@ templates/devshell/
 - Shell aliases, git defaults, editor/env vars declared here
 - `herdr` version
 
+**Also automated:**
+
+| | |
+|--|--|
+| Backup timer | `nsync-status` — rebuild + push every 4h |
+| Agents | `nup` — herdr flake + pi npm `@latest` |
+| Secrets | `sops secrets/secrets.yaml` → `/run/secrets/*` |
+| CI | GitHub Actions builds `.#nixos` on push |
+| Restore audit | `ndrill` — see [docs/RESTORE.md](./docs/RESTORE.md) |
+| Failure notify | webhook via sops `notify-webhook` |
+
 **Intentionally not in git (per-machine / secret):**
 
 | State | Why |
 |-------|-----|
-| `~/.ssh`, age/sops keys | secrets |
+| `~/.config/sops/age/keys.txt` | **private** age key — password manager |
+| `~/.ssh` | secrets |
 | `gh` / cloud auth tokens | secrets |
-| `git config user.*` | personal identity (add to config if you want it shared) |
-| `rustup` installed toolchains | user profile under `~/.rustup` |
-| npm/bun global user installs | prefer project flakes/direnv |
-| Docker images/volumes | runtime data |
-| herdr session layout | runtime data under `~/.config/herdr` |
-| Windows side (WSL version, `.wslconfig`, GPU drivers) | host OS |
+| `git config user.*` | set in `home/default.nix` if you want it shared |
+| `rustup` toolchains | `rustup default stable` |
+| pi binary | npm `~/.local` (version in `agents.lock.json`) |
+| Docker volumes | runtime data |
+| Windows side | host OS |
+
+See [docs/SECRETS.md](./docs/SECRETS.md) (sops-nix vs agenix).
 
 **Architecture note:** this flake targets `x86_64-linux` (WSL2 on Intel/AMD).
 For Windows-on-Arm, change `system` in `flake.nix` to `aarch64-linux` and
