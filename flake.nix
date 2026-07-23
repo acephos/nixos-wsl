@@ -32,6 +32,7 @@
         };
         modules = [
           nixos-wsl.nixosModules.default
+          ./modules/auto-sync.nix
           ./configuration.nix
         ];
       };

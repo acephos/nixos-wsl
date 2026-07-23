@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Periodic backup job: optional flake update → rebuild → commit/tag → push.
+# Invoked by systemd timer nixos-wsl-auto-sync.timer (see modules/auto-sync.nix).
+set -euo pipefail
+
+REPO="${NIXOS_FLAKE:-$HOME/nixos-wsl}"
+ONLY_DIRTY="${NIXOS_AUTO_SYNC_ONLY_DIRTY:-0}"
+UPDATE_FLAKE="${NIXOS_AUTO_SYNC_UPDATE_FLAKE:-0}"
+LOG_TAG="nixos-wsl-auto-sync"
+
+log() { echo "[$LOG_TAG] $*"; }
+
+cd "$REPO"
+export NIXOS_FLAKE="$REPO"
+export NIXOS_AUTO_PUSH="${NIXOS_AUTO_PUSH:-1}"
+export NIXOS_AUTO_COMMIT="${NIXOS_AUTO_COMMIT:-1}"
+# Non-interactive git/gh
+export GIT_TERMINAL_PROMPT=0
+
+if [[ ! -f flake.nix ]]; then
+  log "error: no flake at $REPO"
+  exit 1
+fi
+
+# Ensure we can talk to GitHub non-interactively
+if command -v gh >/dev/null 2>&1; then
+  gh auth setup-git >/dev/null 2>&1 || true
+fi
+
+dirty=0
+if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+  dirty=1
+fi
+
+ahead=0
+if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+  ahead="$(git rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
+else
+  ahead=1 # no upstream yet → treat as needs push
+fi
+
+log "repo=$REPO dirty=$dirty ahead=$ahead only_dirty=$ONLY_DIRTY update_flake=$UPDATE_FLAKE"
+
+if [[ "$UPDATE_FLAKE" == "1" ]]; then
+  log "nix flake update"
+  nix flake update
+  dirty=1
+fi
+
+if [[ "$ONLY_DIRTY" == "1" && "$dirty" == "0" && "$ahead" == "0" ]]; then
+  log "clean and synced with origin — nothing to do"
+  exit 0
+fi
+
+if [[ "$ONLY_DIRTY" == "1" && "$dirty" == "0" && "$ahead" != "0" ]]; then
+  log "local commits not on origin — push only"
+  branch="$(git branch --show-current)"
+  git push -u origin "$branch"
+  git push origin refs/tags/known-good --force 2>/dev/null || true
+  log "push done"
+  exit 0
+fi
+
+log "running rebuild.sh switch"
+exec "$REPO/scripts/rebuild.sh" switch

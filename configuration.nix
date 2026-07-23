@@ -51,6 +51,11 @@ let
     ngood = "~/nixos-wsl/scripts/checkpoint.sh";
     nlist = "sudo nix-env --list-generations -p /nix/var/nix/profiles/system";
     nroll = "sudo nixos-rebuild switch --rollback";
+    # Reload shell config after nrs (aliases live in /etc/zshrc, NOT ./zshrc)
+    nreload = "exec zsh";
+    # Manually kick the backup timer's service once
+    nsync = "sudo systemctl start nixos-wsl-auto-sync.service && journalctl -u nixos-wsl-auto-sync.service -n 40 --no-pager";
+    nsync-status = "systemctl status nixos-wsl-auto-sync.timer nixos-wsl-auto-sync.service --no-pager";
     nix-search = "nix search nixpkgs";
   };
 in
@@ -60,6 +65,39 @@ in
   wsl.interop.includePath = true;
 
   networking.hostName = hostName;
+
+  ##########################################################################
+  # Auto backup: rebuild + commit + push on a timer
+  # Change interval anytime, then nrs. Examples: "4h", "30min", "1d"
+  ##########################################################################
+  nixosWsl.autoSync = {
+    enable = true;
+    interval = "4h";
+    onBoot = "30min";
+    # false = full rebuild heartbeat every interval (what you asked for)
+    # true  = only when git is dirty / unpushed (lighter)
+    onlyWhenDirty = false;
+    # true would run `nix flake update` unattended — leave off unless you want that
+    updateFlake = false;
+    push = true;
+  };
+
+  # Helpful ~/.zshrc — system aliases still come from /etc/zshrc
+  system.activationScripts.acephosDotZshrc.text = ''
+    zshrc=/home/${username}/.zshrc
+    marker='# nixos-wsl managed'
+    if [ ! -f "$zshrc" ] || grep -q 'Created by newuser' "$zshrc" 2>/dev/null || grep -q "$marker" "$zshrc" 2>/dev/null; then
+      cat > "$zshrc" << 'EOF'
+# nixos-wsl managed
+# System aliases, prompt, completion: /etc/zshrc (from configuration.nix)
+# After `nrs`, reload with:   exec zsh    (or: nreload)
+# Do NOT use:  source ./zshrc   ← that path does not exist
+# Optional personal overrides below this line:
+EOF
+      chown ${username}:users "$zshrc"
+      chmod 644 "$zshrc"
+    fi
+  '';
 
   nixpkgs.config.allowUnfree = true;
 
