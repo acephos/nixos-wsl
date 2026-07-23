@@ -99,8 +99,12 @@ if [[ "$DO_PUSH" == "1" ]]; then
   if git remote get-url origin >/dev/null 2>&1; then
     branch="$(git branch --show-current)"
     echo "==> git: pushing $branch + known-good"
+    # Prefer gh credentials (non-interactive); fall back to plain git
+    if command -v gh >/dev/null 2>&1; then
+      gh auth setup-git >/dev/null 2>&1 || true
+    fi
     git push -u origin "$branch"
-    # known-good is force-moved; use force-with-lease on the tag ref
+    # known-good is force-moved on every successful switch
     git push origin refs/tags/known-good --force
   else
     echo "warning: no origin remote — skip push" >&2

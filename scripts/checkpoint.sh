@@ -30,6 +30,7 @@ else
 fi
 
 if [[ "$DO_PUSH" == "1" ]] && git remote get-url origin >/dev/null 2>&1; then
+  command -v gh >/dev/null 2>&1 && gh auth setup-git >/dev/null 2>&1 || true
   git push -u origin HEAD
   git push origin refs/tags/known-good --force
   echo "pushed"
