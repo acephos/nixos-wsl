@@ -81,19 +81,21 @@ if [[ "$DO_HUNK" -eq 1 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# pi packages from ~/.pi/agent/settings.json (or repo copy pre-HM)
+# pi extensions: settings.packages is desired state (install + uninstall)
 # ---------------------------------------------------------------------------
-ensure_pi_packages() {
+# settings.json packages[]  →  what should be installed
+# ~/.pi/agent/npm/package.json dependencies  →  what is on disk
+# reconcile both directions so pi install/remove (or hand-edits) converge.
+reconcile_pi_packages() {
   command -v pi >/dev/null 2>&1 || { log "pi not on PATH — skip packages"; return 0; }
   command -v jq >/dev/null 2>&1 || { log "jq missing — skip pi packages"; return 0; }
 
   local settings=""
-  if [[ -f "$HOME/.pi/agent/settings.json" ]]; then
+  if [[ -f "$HOME/.pi/agent/settings.json" || -L "$HOME/.pi/agent/settings.json" ]]; then
     settings="$HOME/.pi/agent/settings.json"
   elif [[ -f "$REPO/home/pi/settings.json" ]]; then
     mkdir -p "$HOME/.pi/agent"
     settings="$REPO/home/pi/settings.json"
-    # bootstrap race: HM not applied yet — point at repo file once
     if [[ ! -e "$HOME/.pi/agent/settings.json" ]]; then
       ln -sfn "$settings" "$HOME/.pi/agent/settings.json"
       log "linked $HOME/.pi/agent/settings.json → $settings"
@@ -103,20 +105,58 @@ ensure_pi_packages() {
     return 0
   fi
 
-  local pkg count=0 fail=0
+  # Desired sources exactly as settings lists them (npm:@scope/pkg, git:..., etc.)
+  local desired_file installed_file
+  desired_file="$(mktemp)"
+  installed_file="$(mktemp)"
+
+  jq -r '.packages[]? // empty' "$settings" | sed '/^$/d' | sort -u >"$desired_file"
+
+  # On-disk npm extension roots (direct deps only — not transitive)
+  local npm_pkg="$HOME/.pi/agent/npm/package.json"
+  if [[ -f "$npm_pkg" ]]; then
+    jq -r '(.dependencies // {}) | keys[]' "$npm_pkg" 2>/dev/null \
+      | sed 's|^|npm:|' | sort -u >"$installed_file"
+  else
+    : >"$installed_file"
+  fi
+
+  local pkg add=0 add_fail=0 del=0 del_fail=0
+
+  # Install: in settings, missing or stale on disk
   while IFS= read -r pkg; do
-    [[ -z "$pkg" || "$pkg" == "null" ]] && continue
-    count=$((count + 1))
-    # pi install is idempotent when already present; installs missing npm trees
+    [[ -z "$pkg" ]] && continue
     if pi install "$pkg" --no-approve >/dev/null 2>&1 || pi install "$pkg" >/dev/null 2>&1; then
-      :
+      add=$((add + 1))
     else
       log "warn: pi install failed: $pkg"
-      fail=$((fail + 1))
+      add_fail=$((add_fail + 1))
     fi
-  done < <(jq -r '.packages[]? // empty' "$settings")
+  done <"$desired_file"
 
-  log "pi packages ensured: $count (failures=$fail)"
+  # Uninstall: on disk as npm dep but not named in settings.packages
+  # Match npm:name against desired entries (exact source string or npm:name).
+  while IFS= read -r pkg; do
+    [[ -z "$pkg" ]] && continue
+    if grep -Fxq "$pkg" "$desired_file"; then
+      continue
+    fi
+    # also allow desired entry without distinguishing npm: prefix variants
+    if grep -Fxq "${pkg#npm:}" "$desired_file"; then
+      continue
+    fi
+    if pi remove "$pkg" --no-approve >/dev/null 2>&1 || pi remove "$pkg" >/dev/null 2>&1; then
+      log "removed unlisted extension: $pkg"
+      del=$((del + 1))
+    else
+      log "warn: pi remove failed: $pkg"
+      del_fail=$((del_fail + 1))
+    fi
+  done <"$installed_file"
+
+  log "pi extensions reconcile: desired=$(wc -l <"$desired_file") installed_ok=$add install_fail=$add_fail removed=$del remove_fail=$del_fail"
+  rm -f "$desired_file" "$installed_file"
+
   if pi update --extensions >/dev/null 2>&1; then
     log "pi extensions updated"
   else
@@ -164,9 +204,8 @@ if [[ "$DO_PI" -eq 1 ]]; then
     *) export PATH="$npm_config_prefix/bin:$PATH" ;;
   esac
 
-  # Install packages listed in settings.json (managed under home/pi/).
-  # Fresh machine: settings symlink lands via HM before this runs in bootstrap.
-  ensure_pi_packages
+  # Install + uninstall to match settings.packages (home/pi/settings.json).
+  reconcile_pi_packages
 fi
 
 # ---------------------------------------------------------------------------

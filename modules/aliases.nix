@@ -35,6 +35,7 @@
   nsync-status = "systemctl status nixos-wsl-auto-sync.timer nixos-wsl-auto-sync.service --no-pager";
   nup = "~/nixos-wsl/scripts/update-agents.sh && ~/nixos-wsl/scripts/rebuild.sh switch";
   nup-agents = "~/nixos-wsl/scripts/update-agents.sh";
+  npi-sync = "~/nixos-wsl/scripts/sync-pi-config.sh --commit --push";
   ndrill = "~/nixos-wsl/scripts/restore-drill.sh";
   nix-search = "nix search nixpkgs";
 }

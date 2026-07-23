@@ -50,12 +50,30 @@ if [[ "$UPDATE_FLAKE" == "1" ]]; then
   dirty=1
 fi
 
-# herdr + pi only — on by default
+# 1) Pull live pi settings (install/remove writes) into the repo file first.
+if [[ -x "$REPO/scripts/sync-pi-config.sh" ]]; then
+  log "capturing live pi settings/extensions list"
+  "$REPO/scripts/sync-pi-config.sh" || log "warning: sync-pi-config (copy) failed"
+fi
+
+# 2) herdr + pi binary + reconcile extensions to settings.packages
 if [[ "$UPDATE_AGENTS" == "1" ]]; then
-  log "updating agents (herdr + pi)"
+  log "updating agents (herdr + pi + extensions)"
   "$REPO/scripts/update-agents.sh" || log "warning: update-agents.sh failed (continuing)"
   if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
     dirty=1
+  fi
+fi
+
+# 3) Commit+push settings so install/uninstall reaches origin without waiting on rebuild.
+if [[ -x "$REPO/scripts/sync-pi-config.sh" ]]; then
+  log "committing pi settings/extensions list"
+  "$REPO/scripts/sync-pi-config.sh" --commit --push || log "warning: sync-pi-config (commit) failed (continuing)"
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    dirty=1
+  fi
+  if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+    ahead="$(git rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
   fi
 fi
 
@@ -71,6 +89,17 @@ if [[ "$ONLY_DIRTY" == "1" && "$dirty" == "0" && "$ahead" != "0" ]]; then
   git push origin refs/tags/known-good --force 2>/dev/null || true
   log "push done"
   exit 0
+fi
+
+# Settings-only dirt: already committed+pushed above. If nothing else is dirty and
+# onlyWhenDirty, skip the heavy rebuild this tick.
+if [[ "$ONLY_DIRTY" == "1" ]]; then
+  # ignore untracked noise; look at tracked/staged changes excluding nothing critical
+  non_pi_dirty="$(git status --porcelain 2>/dev/null | awk '!($2 ~ /^home\/pi\//){print}' || true)"
+  if [[ -z "$non_pi_dirty" && "$ahead" == "0" ]]; then
+    log "only pi settings changed (already synced) — skip rebuild"
+    exit 0
+  fi
 fi
 
 log "running rebuild.sh switch"

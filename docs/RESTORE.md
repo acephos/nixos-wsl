@@ -9,12 +9,25 @@ Goal: **wipe the distro and be productive again in ~20–30 minutes**
 |------|--------|
 | OS packages, services, zsh, docker | `modules/*.nix` |
 | User dotfiles (npmrc, zshrc stub) | `home/default.nix` |
-| pi settings + extension list | `home/pi/settings.json` (HM symlink → `~/.pi/agent/settings.json`) |
+| pi settings + extension list | `home/pi/settings.json` → `packages[]` |
 | herdr pin | `flake.lock` (+ auto `nup`) |
 | pi version record | `agents.lock.json` (binary via npm on bootstrap) |
-| pi extension packages | installed by `update-agents.sh` from settings `packages` |
+| pi extension packages on disk | reconciled by `update-agents.sh` from `packages[]` |
 | Encrypted secrets ciphertext | `secrets/secrets.yaml` |
 | Install path | `scripts/bootstrap.sh` / `install.ps1` |
+
+### pi extensions (install + uninstall → git every 4h)
+
+`~/.pi/agent/settings.json` is an HM symlink into `home/pi/settings.json`.
+**`packages[]` is the inventory** — node_modules stay local and are rebuilt from it.
+
+| Action | What happens |
+|--------|----------------|
+| `pi install npm:@foo/bar` | adds to `packages[]` + installs under `~/.pi/agent/npm` |
+| `pi remove npm:@foo/bar` | drops from `packages[]` + uninstalls from npm tree |
+| 4h auto-sync | capture live settings → reconcile disk to list → commit+push `home/pi/settings.json` |
+| `npi-sync` | commit+push settings now |
+| `nup` / `nup-agents` | install missing **and remove** on-disk extensions not in `packages[]` |
 
 ## What is NOT in git (you must keep elsewhere)
 

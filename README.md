@@ -108,6 +108,8 @@ Repo lives at `~/nixos-wsl` (aliases assume that path).
 | `nroll` | `nixos-rebuild switch --rollback` |
 | `nreload` | `exec zsh` — pick up new aliases after `nrs` |
 | `nsync` / `nsync-status` | run backup now / show timer status |
+| `nup` / `nup-agents` | update herdr+pi+extensions, rebuild / update only |
+| `npi-sync` | commit+push pi settings + extension list now |
 | `ns <pkg>` | ephemeral `nix shell nixpkgs#<pkg>` |
 
 Edit `configuration.nix` → `nrs` → `nreload` (or open a new terminal).
@@ -154,16 +156,18 @@ nixosWsl.autoSync = {
 |------|---------|----------------|
 | `herdr` | flake input | `nix flake update herdr` on each timer / `nup` |
 | `pi` | npm `@latest` → `~/.local` | `npm i -g …@latest` on each timer / `nup` |
-| pi extensions | `home/pi/settings.json` | `pi install` each package + `pi update --extensions` on `nup` |
+| pi extensions | `home/pi/settings.json` `packages[]` | reconcile install **and** uninstall on each `nup` / 4h tick |
+| pi settings backup | live settings (symlink → repo) | `sync-pi-config --commit --push` on each 4h tick + `npi-sync` |
 | nixpkgs | `flake.lock` | only when you run `nfu` / set `updateFlake` |
 
 Versions last resolved are recorded in [`agents.lock.json`](./agents.lock.json).
 
 ```bash
-nup              # update herdr+pi now, rebuild, push
-nup-agents       # update only (no rebuild)
+nup              # update herdr+pi+extensions, rebuild, push
+nup-agents       # update agents + reconcile extensions only
+npi-sync         # commit+push pi settings/extension list now
 nsync-status
-nsync            # full timer job once + logs
+nsync            # full timer job once + logs (includes pi extension sync)
 journalctl -u nixos-wsl-auto-sync.service -n 50
 ```
 
@@ -219,7 +223,8 @@ templates/devshell/
 | | |
 |--|--|
 | Backup timer | `nsync-status` — rebuild + push every 4h |
-| Agents | `nup` — herdr + hunk flakes + pi npm `@latest` |
+| Agents | `nup` — herdr + hunk + pi `@latest` + extension reconcile |
+| pi extensions | `packages[]` in `home/pi/settings.json` (install/uninstall synced each tick) |
 | Secrets | `sops secrets/secrets.yaml` → `/run/secrets/*` |
 | CI | GitHub Actions builds `.#nixos` on push |
 | Restore audit | `ndrill` — see [docs/RESTORE.md](./docs/RESTORE.md) |
