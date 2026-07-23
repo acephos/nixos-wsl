@@ -25,6 +25,7 @@ Windows 11 + WSL2
 | `home-manager` | `release-26.05` | User dotfiles |
 | `sops-nix` | `Mic92/sops-nix` | Encrypted secrets |
 | `herdr` | `ogulcancelik/herdr` | Agent multiplexer (auto-updated) |
+| `hunk` | `modem-dev/hunk` | Terminal diff review UI (auto-updated) |
 
 The lockfile is the contract. Two machines on the same `flake.lock` evaluate to
 the same store paths (for a given system, currently `x86_64-linux`).
@@ -216,7 +217,7 @@ templates/devshell/
 | | |
 |--|--|
 | Backup timer | `nsync-status` — rebuild + push every 4h |
-| Agents | `nup` — herdr flake + pi npm `@latest` |
+| Agents | `nup` — herdr + hunk flakes + pi npm `@latest` |
 | Secrets | `sops secrets/secrets.yaml` → `/run/secrets/*` |
 | CI | GitHub Actions builds `.#nixos` on push |
 | Restore audit | `ndrill` — see [docs/RESTORE.md](./docs/RESTORE.md) |

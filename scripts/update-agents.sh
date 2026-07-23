@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 # Keep fast-moving agent tools on latest:
 #   - herdr  → nix flake input (system package)
+#   - hunk   → nix flake input (system package)
 #   - pi     → npm global @earendil-works/pi-coding-agent (user ~/.local)
 #
 # Writes agents.lock.json so the repo records what this machine last resolved.
-# Does NOT bump nixpkgs / nixos-wsl.
+# Does NOT bump nixpkgs / nixos-wsl / home-manager / sops-nix.
 #
 # Usage:
 #   ./scripts/update-agents.sh
-#   ./scripts/update-agents.sh --herdr-only | --pi-only
+#   ./scripts/update-agents.sh --herdr-only | --hunk-only | --pi-only
+#   ./scripts/update-agents.sh --flake-only   # herdr+hunk, skip npm
 set -euo pipefail
 
 REPO="${NIXOS_FLAKE:-$HOME/nixos-wsl}"
 DO_HERDR=1
+DO_HUNK=1
 DO_PI=1
 PI_PKG="${NIXOS_PI_PACKAGE:-@earendil-works/pi-coding-agent}"
 LOG_TAG="update-agents"
@@ -22,10 +25,12 @@ die() { echo "[$LOG_TAG] error: $*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --herdr-only) DO_PI=0; shift ;;
-    --pi-only) DO_HERDR=0; shift ;;
+    --herdr-only) DO_HUNK=0; DO_PI=0; shift ;;
+    --hunk-only) DO_HERDR=0; DO_PI=0; shift ;;
+    --pi-only) DO_HERDR=0; DO_HUNK=0; shift ;;
+    --flake-only) DO_PI=0; shift ;;
     -h|--help)
-      sed -n '2,14p' "$0" | sed 's/^# \?//'
+      sed -n '2,16p' "$0" | sed 's/^# \?//'
       exit 0
       ;;
     *) die "unknown arg: $1" ;;
@@ -37,42 +42,52 @@ cd "$REPO"
 
 changed=0
 herdr_rev=""
+hunk_rev=""
 pi_ver=""
 
+lock_rev() {
+  local input="$1"
+  if command -v jq >/dev/null; then
+    jq -r --arg i "$input" '.nodes[$i].locked.rev // empty' flake.lock 2>/dev/null || true
+  fi
+}
+
 # ---------------------------------------------------------------------------
-# herdr — flake input only (leave nixpkgs pinned)
+# Flake inputs: herdr + hunk (leave nixpkgs pinned)
 # ---------------------------------------------------------------------------
-if [[ "$DO_HERDR" -eq 1 ]]; then
+update_flake_input() {
+  local name="$1"
+  local before after
   before="$(git -C "$REPO" hash-object flake.lock 2>/dev/null || echo none)"
-  log "nix flake update herdr"
-  nix flake update herdr
+  log "nix flake update $name"
+  nix flake update "$name"
   after="$(git -C "$REPO" hash-object flake.lock 2>/dev/null || echo none)"
   if [[ "$before" != "$after" ]]; then
-    log "herdr lock changed"
+    log "$name lock changed"
     changed=1
   else
-    log "herdr already latest in lock"
+    log "$name already latest in lock"
   fi
-  # Best-effort rev from lock
-  herdr_rev="$(
-    nix flake metadata "$REPO" --json 2>/dev/null \
-      | jq -r '.locks.nodes.herdr.locked.rev // empty' 2>/dev/null \
-      || true
-  )"
-  if [[ -z "$herdr_rev" ]] && command -v jq >/dev/null; then
-    herdr_rev="$(jq -r '.nodes.herdr.locked.rev // empty' flake.lock 2>/dev/null || true)"
-  fi
+}
+
+if [[ "$DO_HERDR" -eq 1 ]]; then
+  update_flake_input herdr
+  herdr_rev="$(lock_rev herdr)"
+fi
+
+if [[ "$DO_HUNK" -eq 1 ]]; then
+  update_flake_input hunk
+  hunk_rev="$(lock_rev hunk)"
 fi
 
 # ---------------------------------------------------------------------------
-# pi — always latest from npm into ~/.local (matches upstream's install path)
+# pi — always latest from npm into ~/.local
 # ---------------------------------------------------------------------------
 if [[ "$DO_PI" -eq 1 ]]; then
   command -v npm >/dev/null 2>&1 || die "npm not found (nodejs should be in systemPackages)"
   export npm_config_prefix="${npm_config_prefix:-$HOME/.local}"
   mkdir -p "$npm_config_prefix/bin" "$npm_config_prefix/lib"
 
-  # Ensure ~/.npmrc prefix (idempotent)
   npmrc="$HOME/.npmrc"
   if [[ ! -f "$npmrc" ]] || ! grep -q '^prefix=' "$npmrc" 2>/dev/null; then
     echo "prefix=$npm_config_prefix" >>"$npmrc"
@@ -100,7 +115,6 @@ if [[ "$DO_PI" -eq 1 ]]; then
     log "pi already latest (${after_pi:-unknown})"
   fi
 
-  # PATH hint for non-login contexts
   case ":$PATH:" in
     *":$npm_config_prefix/bin:"*) ;;
     *) export PATH="$npm_config_prefix/bin:$PATH" ;;
@@ -108,23 +122,25 @@ if [[ "$DO_PI" -eq 1 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# agents.lock.json — record resolved versions (committed by rebuild/auto-sync)
+# agents.lock.json
 # ---------------------------------------------------------------------------
 lock_path="$REPO/agents.lock.json"
 tmp="$(mktemp)"
-# merge with existing if partial update
-existing_pi=""; existing_herdr=""
+existing_pi=""; existing_herdr=""; existing_hunk=""
 if [[ -f "$lock_path" ]] && command -v jq >/dev/null; then
   existing_pi="$(jq -r '.pi // empty' "$lock_path" 2>/dev/null || true)"
   existing_herdr="$(jq -r '.herdr // empty' "$lock_path" 2>/dev/null || true)"
+  existing_hunk="$(jq -r '.hunk // empty' "$lock_path" 2>/dev/null || true)"
 fi
 [[ -n "$pi_ver" ]] || pi_ver="$existing_pi"
 [[ -n "$herdr_rev" ]] || herdr_rev="$existing_herdr"
+[[ -n "$hunk_rev" ]] || hunk_rev="$existing_hunk"
 
 if command -v jq >/dev/null; then
   jq -n \
     --arg pi "${pi_ver}" \
     --arg herdr "${herdr_rev}" \
+    --arg hunk "${hunk_rev}" \
     --arg piPkg "$PI_PKG" \
     --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --arg host "$(hostname 2>/dev/null || echo unknown)" \
@@ -133,6 +149,8 @@ if command -v jq >/dev/null; then
       piPackage: $piPkg,
       herdr: $herdr,
       herdrInput: "github:ogulcancelik/herdr",
+      hunk: $hunk,
+      hunkInput: "github:modem-dev/hunk",
       updatedAt: $updated,
       updatedOn: $host
     }' >"$tmp"
@@ -143,6 +161,8 @@ else
   "piPackage": "${PI_PKG}",
   "herdr": "${herdr_rev}",
   "herdrInput": "github:ogulcancelik/herdr",
+  "hunk": "${hunk_rev}",
+  "hunkInput": "github:modem-dev/hunk",
   "updatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "updatedOn": "$(hostname 2>/dev/null || echo unknown)"
 }
@@ -157,7 +177,6 @@ else
   rm -f "$tmp"
 fi
 
-log "done changed=$changed pi=${pi_ver:-?} herdr=${herdr_rev:-?}"
-# exit 0 always; print changed on fd3 style via file for callers
+log "done changed=$changed pi=${pi_ver:-?} herdr=${herdr_rev:-?} hunk=${hunk_rev:-?}"
 echo "$changed" >"$REPO/.agents-changed"
 exit 0

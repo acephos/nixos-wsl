@@ -2,10 +2,13 @@
 {
   pkgs,
   herdr,
+  hunk,
   ...
 }:
 let
-  herdrPkg = herdr.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  sys = pkgs.stdenv.hostPlatform.system;
+  herdrPkg = herdr.packages.${sys}.default;
+  hunkPkg = hunk.packages.${sys}.default;
 in
 {
   environment.systemPackages = with pkgs; [
@@ -14,7 +17,8 @@ in
     vim
     tmux
     starship
-    herdrPkg
+    herdrPkg # agent multiplexer
+    hunkPkg # review-first terminal diff (modem-dev/hunk)
 
     # --- VCS ---
     git

@@ -8,6 +8,9 @@
   g = "git";
   lg = "lazygit";
   h = "herdr";
+  hk = "hunk";
+  hdiff = "git hdiff";
+  hshow = "git hshow";
   v = "nvim";
   vi = "nvim";
   vim = "nvim";

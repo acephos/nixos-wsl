@@ -11,16 +11,17 @@
       pull.rebase = true;
       push.autoSetupRemote = true;
       core.editor = "nvim";
-      core.pager = "delta";
-      interactive.diffFilter = "delta --color-only";
-      delta = {
-        navigate = true;
-        line-numbers = true;
-        side-by-side = false;
+      # Review-first diffs via hunk (modem-dev/hunk)
+      # https://github.com/modem-dev/hunk — Install / Working with Git
+      core.pager = "hunk pager";
+      alias = {
+        # Opt-in forms from upstream docs (core.pager already set globally)
+        hdiff = "-c core.pager=\"hunk pager\" diff";
+        hshow = "-c core.pager=\"hunk pager\" show";
       };
       merge.conflictstyle = "zdiff3";
       rerere.enabled = true;
-      # Identity lives in home-manager (home/git.nix) — not here.
+      # Identity lives in home-manager (home/default.nix) — not here.
     };
   };
 

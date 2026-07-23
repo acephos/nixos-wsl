@@ -22,6 +22,9 @@
 
     # Agent multiplexer — https://herdr.dev (auto-updated by update-agents.sh)
     herdr.url = "github:ogulcancelik/herdr";
+
+    # Review-first terminal diff viewer — https://github.com/modem-dev/hunk
+    hunk.url = "github:modem-dev/hunk";
   };
 
   outputs =
@@ -32,6 +35,7 @@
       home-manager,
       sops-nix,
       herdr,
+      hunk,
       ...
     }@inputs:
     let
@@ -47,6 +51,7 @@
           inherit
             inputs
             herdr
+            hunk
             username
             hostName
             ;
