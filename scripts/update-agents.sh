@@ -206,6 +206,11 @@ if [[ "$DO_PI" -eq 1 ]]; then
 
   # Install + uninstall to match settings.packages (home/pi/settings.json).
   reconcile_pi_packages
+
+  # Re-apply local pi-web-access fix (upstream try/catch scope crash on WSL).
+  if [[ -x "$REPO/scripts/patch-pi-web-access.sh" ]]; then
+    "$REPO/scripts/patch-pi-web-access.sh" || log "warn: patch-pi-web-access failed"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

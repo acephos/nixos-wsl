@@ -37,6 +37,10 @@
   home.file.".pi/agent/settings.json".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nixos-wsl/home/pi/settings.json";
 
+  # pi-web-access config — auto-summary avoids curator browser (broken/headless on WSL).
+  home.file.".pi/web-search.json".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/nixos-wsl/home/pi/web-search.json";
+
   # Lightweight zshrc — system owns aliases/prompt in /etc/zshrc
   home.file.".zshrc".text = ''
     # nixos-wsl managed (home-manager)

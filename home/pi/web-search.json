@@ -1,0 +1,4 @@
+{
+  "workflow": "auto-summary",
+  "curatorTimeoutSeconds": 20
+}
