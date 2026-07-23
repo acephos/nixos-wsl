@@ -108,34 +108,56 @@ Repo lives at `~/nixos-wsl` (aliases assume that path).
 | `ngood [msg]` | checkpoint git **without** rebuilding (before experiments) |
 | `nlist` | list system generations |
 | `nroll` | `nixos-rebuild switch --rollback` |
+| `nreload` | `exec zsh` — pick up new aliases after `nrs` |
+| `nsync` / `nsync-status` | run backup now / show timer status |
 | `ns <pkg>` | ephemeral `nix shell nixpkgs#<pkg>` |
 
-Edit `configuration.nix` → `nrs`.
+Edit `configuration.nix` → `nrs` → `nreload` (or open a new terminal).
+
+### Reload shell (the `./zshrc` issue)
+
+System aliases live in **`/etc/zshrc`**, not `./zshrc` or even only `~/.zshrc`.
+
+```bash
+exec zsh              # best — or: nreload
+source /etc/zshrc     # also works
+source ~/.zshrc       # personal overrides only
+# WRONG:  source ./zshrc   ← file does not exist
+```
 
 ### Git automation (what runs when)
 
-**Nothing is on a timer.** The remote updates only when you rebuild (or checkpoint).
-
 | Event | Commit? | Tag `known-good`? | Push? |
 |-------|---------|-------------------|-------|
-| `nrs` success | yes, if tree dirty | yes (moved to HEAD) | yes (default) |
-| `nrs --no-push` | yes | yes | no |
-| `ngood "before X"` | yes, if dirty | yes | yes (default) |
+| `nrs` success | yes, if tree dirty | yes | yes (default) |
+| **timer every 4h** | yes, if dirty | yes | yes |
+| `ngood "before X"` | yes, if dirty | yes | yes |
 | failed rebuild | **no** | **no** | **no** |
-| plain `git commit` | your call | no | no |
 
-Disable push for one shot or forever:
+#### Periodic timer (default: every 4 hours)
 
-```bash
-nrs --no-push
-export NIXOS_AUTO_PUSH=0    # session default off
+In `configuration.nix`:
+
+```nix
+nixosWsl.autoSync = {
+  enable = true;
+  interval = "4h";       # "30min", "6h", "1d", …
+  onBoot = "30min";
+  onlyWhenDirty = false; # true = skip when clean+pushed
+  updateFlake = false;   # true = also `nix flake update` (risky)
+  push = true;
+};
 ```
 
-Git hooks (enable once per clone: `./scripts/install-hooks.sh`):
+```bash
+nsync-status
+nsync                                          # one-shot now + logs
+journalctl -u nixos-wsl-auto-sync.service -n 50
+```
 
-- `githooks/pre-commit` — refuse secret-looking files; require `flake.lock` with `flake.nix`; parse-check staged `*.nix`
+Disable push: `nrs --no-push` or `export NIXOS_AUTO_PUSH=0`.
 
-There is **no** cron/systemd timer. Frequency = how often you run `nrs`.
+Git hooks (once per clone: `./scripts/install-hooks.sh`): block secrets, require `flake.lock`, parse-check `*.nix`.
 
 ### Updating the world
 
@@ -155,14 +177,15 @@ Rollback map:
 ## Repo layout
 
 ```
-flake.nix              # inputs + nixosConfigurations.nixos
-flake.lock             # THE pin — commit this always
-configuration.nix      # full system config (packages, shell, services)
-scripts/rebuild.sh     # nrs backend: switch + checkpoint + push
-scripts/checkpoint.sh  # ngood backend
-scripts/install-hooks.sh
-githooks/pre-commit    # secret/lockfile/syntax guards
-templates/devshell/    # copy into projects + direnv
+flake.nix                 # inputs + nixosConfigurations.nixos
+flake.lock                # THE pin — commit this always
+configuration.nix         # full system config + autoSync interval
+modules/auto-sync.nix     # systemd timer options
+scripts/rebuild.sh        # nrs backend
+scripts/auto-sync.sh      # timer backend
+scripts/checkpoint.sh     # ngood backend
+githooks/pre-commit
+templates/devshell/
 ```
 
 ## 100% parity — what that means

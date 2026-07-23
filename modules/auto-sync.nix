@@ -77,9 +77,11 @@ in
         "network-online.target"
         "nix-daemon.service"
       ];
+      # `path` entries are treated as prefixes; NixOS appends /bin automatically.
+      # So use /run/wrappers (→ …/bin/sudo), not /run/wrappers/bin.
       path = [
-        "/run/wrappers/bin" # sudo
-        "/run/current-system/sw/bin"
+        "/run/wrappers"
+        "/run/current-system/sw"
         pkgs.bash
         pkgs.coreutils
         pkgs.git
@@ -87,6 +89,7 @@ in
         pkgs.nix
         pkgs.gnugrep
         pkgs.gawk
+        pkgs.util-linux # flock
       ];
       environment = {
         HOME = home;
@@ -106,8 +109,8 @@ in
         User = username;
         Group = "users";
         WorkingDirectory = cfg.flakePath;
-        ExecStart = "${cfg.flakePath}/scripts/auto-sync.sh";
-        # Don't wedge the machine if something hangs
+        # flock: skip if a manual nrs / another tick is already running
+        ExecStart = "${pkgs.util-linux}/bin/flock -n ${cfg.flakePath}/.auto-sync.lock ${cfg.flakePath}/scripts/auto-sync.sh";
         TimeoutStartSec = "2h";
         Nice = 10;
       };
@@ -120,6 +123,7 @@ in
         OnBootSec = cfg.onBoot;
         OnUnitActiveSec = cfg.interval;
         Persistent = true; # catch up after sleep/WSL shutdown
+        RandomizedDelaySec = "10min";
         Unit = "nixos-wsl-auto-sync.service";
       };
     };
