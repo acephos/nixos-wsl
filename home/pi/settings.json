@@ -35,5 +35,6 @@
     "npm:glimpseui",
     "npm:pi-web-access",
     "npm:@xaccefy/pi-xpi"
-  ]
+  ],
+  "lastChangelogVersion": "0.81.1"
 }
