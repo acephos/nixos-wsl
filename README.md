@@ -27,73 +27,68 @@ Windows 11 + WSL2
 The lockfile is the contract. Two machines on the same `flake.lock` evaluate to
 the same store paths (for a given system, currently `x86_64-linux`).
 
-## Fresh install (new Windows machine)
+## Fresh install (new machine)
 
-### 1. Prerequisites (Windows)
+### Recommended: one script
 
-- Windows 11 (or Win10 with WSL2)
-- Admin PowerShell:
-
-```powershell
-wsl --install --no-distribution
-wsl --set-default-version 2
-```
-
-Reboot if prompted. Install a recent [WSLg-capable WSL](https://github.com/microsoft/WSL/releases).
-
-### 2. Install NixOS-WSL base
-
-From [NixOS-WSL releases](https://github.com/nix-community/NixOS-WSL/releases)
-grab the latest `.wsl` (or `.tar.gz`) for your arch and install:
+**Windows (Admin PowerShell)** — installs WSL2, latest NixOS-WSL base image,
+then applies this repo at tag **`known-good`**:
 
 ```powershell
-# .wsl double-click works on recent WSL, or:
-wsl --install --from-file .\nixos.wsl
-# older method:
-# wsl --import NixOS $env:USERPROFILE\NixOS .\nixos-wsl.tar.gz --version 2
+irm https://raw.githubusercontent.com/acephos/nixos-wsl/main/scripts/install.ps1 | iex
 ```
 
-First boot creates the default user. Then:
+Reboot if WSL features were just enabled, then re-run the same command.
+
+**Already inside NixOS-WSL** (or any NixOS):
 
 ```bash
-sudo nix-channel --update   # only needed on the stock channel image
+curl -fsSL https://raw.githubusercontent.com/acephos/nixos-wsl/main/scripts/bootstrap.sh | bash
 ```
 
-### 3. Apply this flake
+That will:
+
+1. Install prerequisites (`git`, flakes, …) if missing  
+2. Clone/update `~/nixos-wsl` at **`known-good`** (falls back to `main`)  
+3. `nixos-rebuild switch` your full system from `flake.lock`  
+4. Print the few human steps left (auth, rustup)
+
+Options:
 
 ```bash
-# install git if the base image is bare
-sudo nix-env -iA nixos.git   # or use the image's git
-
-git clone https://github.com/acephos/nixos-wsl.git ~/nixos-wsl
-cd ~/nixos-wsl
-./scripts/install-hooks.sh   # enable repo git hooks
-
-# optional: fork? set your username in flake.nix (username / hostName)
-
-./scripts/rebuild.sh switch  # or after first switch: nrs
+bash <(curl -fsSL …/bootstrap.sh) --ref known-good   # default
+bash <(curl -fsSL …/bootstrap.sh) --ref main
+bash <(curl -fsSL …/bootstrap.sh) --no-rebuild        # fetch only
+bash <(curl -fsSL …/bootstrap.sh) --push              # push after switch
 ```
 
-Log out / open a new shell. You should be on zsh with the full toolset.
-
-### 4. One-time human state (not in the flake)
-
-Nix can reproduce the OS. It cannot (and should not) check in secrets or
-machine-local identity:
+After bootstrap:
 
 ```bash
-# Rust toolchain (rustup is installed; toolchain is user state)
+exec zsh                 # pick up aliases (not: source ./zshrc)
 rustup default stable
-
-# Git identity
 git config --global user.name  "Your Name"
 git config --global user.email "you@example.com"
-
-# GitHub CLI
-gh auth login
-
-# Optional: SSH key, age/sops keys, cloud CLIs, etc.
+gh auth login && gh auth setup-git
+nrs                      # turn on auto-push now that gh works
+nsync-status             # 4h backup timer
 ```
+
+> Flake user is `acephos`. Create that user on first boot, or change
+> `username` in `flake.nix` before switching.
+
+### Manual install (if you prefer)
+
+1. Windows: `wsl --install --no-distribution` → reboot → install
+   [NixOS-WSL](https://github.com/nix-community/NixOS-WSL/releases) `.wsl`
+2. Inside NixOS:
+   ```bash
+   git clone https://github.com/acephos/nixos-wsl.git ~/nixos-wsl
+   cd ~/nixos-wsl && git checkout known-good
+   ./scripts/install-hooks.sh
+   ./scripts/rebuild.sh switch --no-push
+   exec zsh
+   ```
 
 ## Day-to-day on an existing machine
 
