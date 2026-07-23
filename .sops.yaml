@@ -1,0 +1,9 @@
+# sops creation rules — encrypt with the age pubkey of this machine's owner.
+# Add more age keys under `key_groups` when you get a second machine/person.
+keys:
+  - &primary age177f42qrj8euu2dq28wnqc0et8ku6kunqgz0cyq5vh7rxa4epzp3s3ljvcc
+creation_rules:
+  - path_regex: secrets/[^/]+\.(yaml|yml|json|env)$
+    key_groups:
+      - age:
+          - *primary

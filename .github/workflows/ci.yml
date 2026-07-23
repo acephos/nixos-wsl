@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: DeterminateSystems/nix-installer-action@v16
+
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+
+      - name: flake show
+        run: nix flake show --all-systems false
+
+      - name: build nixos system closure
+        run: nix build .#nixos --print-build-logs
+
+      - name: flake check
+        run: nix flake check --print-build-logs
+
+      - name: scripts syntax
+        run: |
+          for s in scripts/*.sh; do
+            bash -n "$s"
+            echo "ok $s"
+          done

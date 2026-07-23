@@ -17,12 +17,27 @@ if git diff --cached --name-only | grep -qx 'flake.nix'; then
   fi
 fi
 
-# Refuse private key material
-if git diff --cached --name-only | grep -E '(^|/)\.env$|\.pem$|\.key$|id_rsa|id_ed25519|secrets\.yaml$' >/dev/null; then
-  echo "pre-commit: refusing to commit secret-looking paths:" >&2
-  git diff --cached --name-only | grep -E '(^|/)\.env$|\.pem$|\.key$|id_rsa|id_ed25519|secrets\.yaml$' >&2
-  exit 1
-fi
+# Refuse private key material (allow sops-encrypted secrets/*.yaml)
+while IFS= read -r f; do
+  [[ -z "$f" ]] && continue
+  case "$f" in
+    secrets/*.example.yaml|secrets/*.example.yml|secrets/secrets.example.yaml)
+      continue # plaintext template OK
+      ;;
+    secrets/*.yaml|secrets/*.yml)
+      # must look like sops ciphertext
+      if [[ -f "$f" ]] && grep -q '^sops:' "$f" && grep -q 'ENC\[AES256_GCM' "$f"; then
+        continue
+      fi
+      echo "pre-commit: $f must be sops-encrypted (missing sops metadata)" >&2
+      exit 1
+      ;;
+    *.pem|*.key|*id_rsa*|*id_ed25519*|*/.env|.env|**/keys.txt|**/.sops/age/*)
+      echo "pre-commit: refusing private key / env path: $f" >&2
+      exit 1
+      ;;
+  esac
+done < <(git diff --cached --name-only)
 
 # Fast syntax check on staged nix files (no full eval — that needs network sometimes)
 if command -v nix-instantiate >/dev/null 2>&1; then
