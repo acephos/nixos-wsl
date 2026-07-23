@@ -15,10 +15,16 @@ jobs:
 
       - uses: DeterminateSystems/nix-installer-action@v16
 
-      - uses: DeterminateSystems/magic-nix-cache-action@v9
+      # magic-nix-cache is EOL / FlakeHub-auth noisy; GH cache is enough for this repo
+      - uses: nix-community/cache-nix-action@v6
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size: 5G
 
       - name: flake show
-        run: nix flake show --all-systems false
+        # --all-systems is a boolean flag; do NOT pass a bare "false" (nix treats it as a flake URL)
+        run: nix flake show
 
       - name: build nixos system closure
         run: nix build .#nixos --print-build-logs
