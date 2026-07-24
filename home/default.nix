@@ -53,12 +53,31 @@
   # Git identity — edit these, then nrs (not secrets, but personal)
   programs.git = {
     enable = true;
-    # Uncomment / set:
-    # userName = "acephos";
-    # userEmail = "you@example.com";
     settings = {
+      user.name = "acephos";
+      user.email = "acephos@users.noreply.github.com";
       # gh credential helper is set by `gh auth setup-git`
     };
+  };
+
+  # Pi harness-study corpus: ingest/derive/push every 30m while user session is up.
+  # Repo: ~/harness-study (https://github.com/acephos/harness-study)
+  systemd.user.services.harness-study-sync = {
+    Unit.Description = "Pi harness-study session sync";
+    Service = {
+      Type = "oneshot";
+      WorkingDirectory = "%h/harness-study";
+      ExecStart = "${pkgs.python3}/bin/python3 %h/harness-study/study.py sync";
+    };
+  };
+  systemd.user.timers.harness-study-sync = {
+    Unit.Description = "Timer for Pi harness-study session sync";
+    Timer = {
+      OnBootSec = "5m";
+      OnUnitActiveSec = "30m";
+      Persistent = true;
+    };
+    Install.WantedBy = [ "timers.target" ];
   };
 
   xdg.enable = true;
