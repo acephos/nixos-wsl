@@ -38,4 +38,8 @@
   npi-sync = "~/nixos-wsl/scripts/sync-pi-config.sh --commit --push";
   ndrill = "~/nixos-wsl/scripts/restore-drill.sh";
   nix-search = "nix search nixpkgs";
+  # Android
+  apkde = "cd ~/im-ok-maa";
+  adb-devices = "adb devices -l";
+  android-env = "~/nixos-wsl/scripts/android-env-check.sh";
 }

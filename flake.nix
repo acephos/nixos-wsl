@@ -64,6 +64,7 @@
           ./modules/packages.nix
           ./modules/shell.nix
           ./modules/dev.nix
+          ./modules/android.nix
           ./modules/auto-sync.nix
           ./modules/notify.nix
           ./modules/secrets.nix

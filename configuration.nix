@@ -7,6 +7,7 @@
 #   modules/packages.nix   systemPackages + env vars
 #   modules/shell.nix      zsh/bash/starship/tmux
 #   modules/dev.nix        git/direnv/docker
+#   modules/android.nix    JDK17 + adb + ANDROID_HOME
 #   modules/auto-sync.nix  backup timer options + unit
 #   modules/notify.nix     OnFailure webhook/log
 #   modules/secrets.nix    sops-nix wiring
