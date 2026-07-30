@@ -1,10 +1,10 @@
 {
-  "pi": "0.82.0",
+  "pi": "0.83.0",
   "piPackage": "@earendil-works/pi-coding-agent",
-  "herdr": "d4e0dd3d903c50d2edb8c3cec71952a83989b310",
+  "herdr": "ac47b9e67912c82dac17388e5541d969a7372c23",
   "herdrInput": "github:ogulcancelik/herdr",
-  "hunk": "a8a49d9df6747f664eb9b4910c551cd4b055909e",
+  "hunk": "3fac32d945449efc6adc7fb4583a9786a7280e30",
   "hunkInput": "github:modem-dev/hunk",
-  "updatedAt": "2026-07-25T03:42:18Z",
+  "updatedAt": "2026-07-30T16:27:30Z",
   "updatedOn": "nixos"
 }

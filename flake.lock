@@ -8,7 +8,10 @@
           "hunk",
           "nixpkgs"
         ],
-        "systems": "systems",
+        "systems": [
+          "hunk",
+          "systems"
+        ],
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
@@ -65,11 +68,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1784942815,
-        "narHash": "sha256-sSzijwp8RjM048EaWgRH1dP6oLLPz7jd3rNKaMbzVdk=",
+        "lastModified": 1785428100,
+        "narHash": "sha256-g8P+fh/jjImobm9rgKQ/MgKtwplh7acW0udXt4keHSo=",
         "owner": "ogulcancelik",
         "repo": "herdr",
-        "rev": "d4e0dd3d903c50d2edb8c3cec71952a83989b310",
+        "rev": "ac47b9e67912c82dac17388e5541d969a7372c23",
         "type": "github"
       },
       "original": {
@@ -102,14 +105,15 @@
     "hunk": {
       "inputs": {
         "bun2nix": "bun2nix",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "systems": "systems"
       },
       "locked": {
-        "lastModified": 1784933917,
-        "narHash": "sha256-c/bCvCe6s/NSGvA6AWKZGpkL+4zgJtwilvsNTnkk6pY=",
+        "lastModified": 1785375658,
+        "narHash": "sha256-Qx9ERQCyhRQnES3nojmIOQjpHYw/7yNEL2Vuoxsi37Q=",
         "owner": "modem-dev",
         "repo": "hunk",
-        "rev": "a8a49d9df6747f664eb9b4910c551cd4b055909e",
+        "rev": "3fac32d945449efc6adc7fb4583a9786a7280e30",
         "type": "github"
       },
       "original": {
@@ -271,16 +275,16 @@
     },
     "systems": {
       "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
+        "lastModified": 1776166891,
+        "narHash": "sha256-bI8yrEGjrohR5hkQox7UrxDH7XqrYMwI8SL/LrJ1+S8=",
         "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
+        "repo": "triplet",
+        "rev": "6de7bc09397911ce03636afbcf6118745ab2cda0",
         "type": "github"
       },
       "original": {
         "owner": "nix-systems",
-        "repo": "default",
+        "repo": "triplet",
         "type": "github"
       }
     },
