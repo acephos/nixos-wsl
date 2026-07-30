@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 # Keep fast-moving agent tools on latest:
-#   - herdr  → nix flake input (system package)
-#   - hunk   → nix flake input (system package)
-#   - pi     → npm global @earendil-works/pi-coding-agent (user ~/.local)
+#   - herdr → nix flake input (system package)
+#   - hunk  → nix flake input (system package)
+#   - pi    → npm global @earendil-works/pi-coding-agent (user ~/.local)
+#   - omp   → bun global @oh-my-pi/pi-coding-agent (user ~/.bun)
 #
 # Writes agents.lock.json so the repo records what this machine last resolved.
 # Does NOT bump nixpkgs / nixos-wsl / home-manager / sops-nix.
 #
 # Usage:
 #   ./scripts/update-agents.sh
-#   ./scripts/update-agents.sh --herdr-only | --hunk-only | --pi-only
-#   ./scripts/update-agents.sh --flake-only   # herdr+hunk, skip npm
+#   ./scripts/update-agents.sh --herdr-only | --hunk-only | --pi-only | --omp-only
+#   ./scripts/update-agents.sh --flake-only   # herdr+hunk, skip npm/bun
 set -euo pipefail
 
 REPO="${NIXOS_FLAKE:-$HOME/nixos-wsl}"
 DO_HERDR=1
 DO_HUNK=1
 DO_PI=1
+DO_OMP=1
 PI_PKG="${NIXOS_PI_PACKAGE:-@earendil-works/pi-coding-agent}"
+OMP_PKG="${NIXOS_OMP_PACKAGE:-@oh-my-pi/pi-coding-agent}"
 LOG_TAG="update-agents"
 
 log() { echo "[$LOG_TAG] $*"; }
@@ -25,10 +28,11 @@ die() { echo "[$LOG_TAG] error: $*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --herdr-only) DO_HUNK=0; DO_PI=0; shift ;;
-    --hunk-only) DO_HERDR=0; DO_PI=0; shift ;;
-    --pi-only) DO_HERDR=0; DO_HUNK=0; shift ;;
-    --flake-only) DO_PI=0; shift ;;
+    --herdr-only) DO_HUNK=0; DO_PI=0; DO_OMP=0; shift ;;
+    --hunk-only) DO_HERDR=0; DO_PI=0; DO_OMP=0; shift ;;
+    --pi-only) DO_HERDR=0; DO_HUNK=0; DO_OMP=0; shift ;;
+    --omp-only) DO_HERDR=0; DO_HUNK=0; DO_PI=0; shift ;;
+    --flake-only) DO_PI=0; DO_OMP=0; shift ;;
     -h|--help)
       sed -n '2,16p' "$0" | sed 's/^# \?//'
       exit 0
@@ -44,6 +48,7 @@ changed=0
 herdr_rev=""
 hunk_rev=""
 pi_ver=""
+omp_ver=""
 
 lock_rev() {
   local input="$1"
@@ -214,31 +219,77 @@ if [[ "$DO_PI" -eq 1 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# omp — always latest from bun into ~/.bun
+# ---------------------------------------------------------------------------
+if [[ "$DO_OMP" -eq 1 ]]; then
+  command -v bun >/dev/null 2>&1 || die "bun not found (bun should be in systemPackages)"
+
+  bun_home="${BUN_INSTALL:-$HOME/.bun}"
+  mkdir -p "$bun_home/bin" "$bun_home/install/global"
+  case ":$PATH:" in
+    *":$bun_home/bin:"*) ;;
+    *) export PATH="$bun_home/bin:$PATH" ;;
+  esac
+
+  before_omp=""
+  if command -v omp >/dev/null 2>&1; then
+    before_omp="$(omp --version 2>/dev/null | head -1 || true)"
+  fi
+
+  log "bun add -g ${OMP_PKG}@latest  (BUN_INSTALL=$bun_home)"
+  BUN_INSTALL="$bun_home" bun add -g "${OMP_PKG}@latest"
+
+  bun_global_pkg="$bun_home/install/global/package.json"
+  if [[ -f "$bun_global_pkg" ]] && command -v jq >/dev/null; then
+    omp_ver="$(jq -r --arg p "$OMP_PKG" '.dependencies[$p] // empty' "$bun_global_pkg" 2>/dev/null || true)"
+    omp_ver="${omp_ver#^}"
+  fi
+  if [[ -z "$omp_ver" ]] && command -v omp >/dev/null 2>&1; then
+    omp_ver="$(omp --version 2>/dev/null | head -1 || true)"
+    omp_ver="${omp_ver#omp/}"
+  fi
+
+  after_omp="$(command -v omp >/dev/null && omp --version 2>/dev/null | head -1 || true)"
+  if [[ "$before_omp" != "$after_omp" ]]; then
+    log "omp updated: ${before_omp:-none} → ${after_omp:-unknown}"
+    changed=1
+  else
+    log "omp already latest (${after_omp:-unknown})"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # agents.lock.json
 # ---------------------------------------------------------------------------
 lock_path="$REPO/agents.lock.json"
 tmp="$(mktemp)"
-existing_pi=""; existing_herdr=""; existing_hunk=""
+existing_pi=""; existing_omp=""; existing_herdr=""; existing_hunk=""
 if [[ -f "$lock_path" ]] && command -v jq >/dev/null; then
   existing_pi="$(jq -r '.pi // empty' "$lock_path" 2>/dev/null || true)"
+  existing_omp="$(jq -r '.omp // empty' "$lock_path" 2>/dev/null || true)"
   existing_herdr="$(jq -r '.herdr // empty' "$lock_path" 2>/dev/null || true)"
   existing_hunk="$(jq -r '.hunk // empty' "$lock_path" 2>/dev/null || true)"
 fi
 [[ -n "$pi_ver" ]] || pi_ver="$existing_pi"
+[[ -n "$omp_ver" ]] || omp_ver="$existing_omp"
 [[ -n "$herdr_rev" ]] || herdr_rev="$existing_herdr"
 [[ -n "$hunk_rev" ]] || hunk_rev="$existing_hunk"
 
 if command -v jq >/dev/null; then
   jq -n \
     --arg pi "${pi_ver}" \
+    --arg omp "${omp_ver}" \
     --arg herdr "${herdr_rev}" \
     --arg hunk "${hunk_rev}" \
     --arg piPkg "$PI_PKG" \
+    --arg ompPkg "$OMP_PKG" \
     --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --arg host "$(hostname 2>/dev/null || echo unknown)" \
     '{
       pi: $pi,
       piPackage: $piPkg,
+      omp: $omp,
+      ompPackage: $ompPkg,
       herdr: $herdr,
       herdrInput: "github:ogulcancelik/herdr",
       hunk: $hunk,
@@ -251,6 +302,8 @@ else
 {
   "pi": "${pi_ver}",
   "piPackage": "${PI_PKG}",
+  "omp": "${omp_ver}",
+  "ompPackage": "${OMP_PKG}",
   "herdr": "${herdr_rev}",
   "herdrInput": "github:ogulcancelik/herdr",
   "hunk": "${hunk_rev}",
@@ -269,6 +322,6 @@ else
   rm -f "$tmp"
 fi
 
-log "done changed=$changed pi=${pi_ver:-?} herdr=${herdr_rev:-?} hunk=${hunk_rev:-?}"
+log "done changed=$changed pi=${pi_ver:-?} omp=${omp_ver:-?} herdr=${herdr_rev:-?} hunk=${hunk_rev:-?}"
 echo "$changed" >"$REPO/.agents-changed"
 exit 0

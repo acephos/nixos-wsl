@@ -1,10 +1,12 @@
 {
   "pi": "0.83.0",
   "piPackage": "@earendil-works/pi-coding-agent",
+  "omp": "17.2.1",
+  "ompPackage": "@oh-my-pi/pi-coding-agent",
   "herdr": "ac47b9e67912c82dac17388e5541d969a7372c23",
   "herdrInput": "github:ogulcancelik/herdr",
   "hunk": "3fac32d945449efc6adc7fb4583a9786a7280e30",
   "hunkInput": "github:modem-dev/hunk",
-  "updatedAt": "2026-07-30T17:04:53Z",
+  "updatedAt": "2026-07-30T17:13:20Z",
   "updatedOn": "nixos"
 }

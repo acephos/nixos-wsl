@@ -36,7 +36,7 @@ in
 
     interactiveShellInit = ''
       # User bins — keep /run/wrappers/bin first (setuid sudo)
-      export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/go/bin:$PATH"
+      export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.cargo/bin:$HOME/go/bin:$PATH"
 
       eval "$(starship init zsh)"
       command -v zoxide >/dev/null && eval "$(zoxide init zsh)"

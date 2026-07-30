@@ -150,11 +150,13 @@ nixosWsl.autoSync = {
 };
 ```
 
-**Always-latest agents** (herdr + pi), base OS stays pinned:
+**Always-latest agents** (herdr + hunk + omp + pi), base OS stays pinned:
 
 | Tool | Channel | How it updates |
 |------|---------|----------------|
 | `herdr` | flake input | `nix flake update herdr` on each timer / `nup` |
+| `hunk` | flake input | `nix flake update hunk` on each timer / `nup` |
+| `omp` | Bun global `@oh-my-pi/pi-coding-agent@latest` → `~/.bun` | `bun add -g …@latest` on each timer / `nup` |
 | `pi` | npm `@latest` → `~/.local` | `npm i -g …@latest` on each timer / `nup` |
 | pi extensions | `home/pi/settings.json` `packages[]` | reconcile install **and** uninstall on each `nup` / 4h tick |
 | pi settings backup | live settings (symlink → repo) | `sync-pi-config --commit --push` on each 4h tick + `npi-sync` |
@@ -163,7 +165,7 @@ nixosWsl.autoSync = {
 Versions last resolved are recorded in [`agents.lock.json`](./agents.lock.json).
 
 ```bash
-nup              # update herdr+pi+extensions, rebuild, push
+nup              # update herdr+hunk+omp+pi+extensions, rebuild, push
 nup-agents       # update agents + reconcile extensions only
 npi-sync         # commit+push pi settings/extension list now
 nsync-status
@@ -223,7 +225,7 @@ templates/devshell/
 | | |
 |--|--|
 | Backup timer | `nsync-status` — rebuild + push every 4h |
-| Agents | `nup` — herdr + hunk + pi `@latest` + extension reconcile |
+| Agents | `nup` — herdr + hunk + omp + pi `@latest` + extension reconcile |
 | pi extensions | `packages[]` in `home/pi/settings.json` (install/uninstall synced each tick) |
 | Secrets | `sops secrets/secrets.yaml` → `/run/secrets/*` |
 | CI | GitHub Actions builds `.#nixos` on push |
@@ -239,7 +241,7 @@ templates/devshell/
 | `gh` / cloud auth tokens | secrets |
 | `git config user.*` | set in `home/default.nix` if you want it shared |
 | `rustup` toolchains | `rustup default stable` |
-| pi binary | npm `~/.local` (version in `agents.lock.json`) |
+| `omp` / pi binaries | Bun `~/.bun` / npm `~/.local` (versions in `agents.lock.json`) |
 | pi settings/extensions | `home/pi/settings.json` → `~/.pi/agent/settings.json` |
 | Docker volumes | runtime data |
 | Windows side | host OS |
