@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Keep fast-moving agent tools on latest:
 #   - herdr → nix flake input (system package)
-#   - hunk  → nix flake input (system package)
+#   - tuicr → nix flake input (system package)
 #   - pi    → npm global @earendil-works/pi-coding-agent (user ~/.local)
 #   - omp   → bun global @oh-my-pi/pi-coding-agent (user ~/.bun)
 #
@@ -10,13 +10,13 @@
 #
 # Usage:
 #   ./scripts/update-agents.sh
-#   ./scripts/update-agents.sh --herdr-only | --hunk-only | --pi-only | --omp-only
-#   ./scripts/update-agents.sh --flake-only   # herdr+hunk, skip npm/bun
+#   ./scripts/update-agents.sh --herdr-only | --tuicr-only | --pi-only | --omp-only
+#   ./scripts/update-agents.sh --flake-only   # herdr+tuicr, skip npm/bun
 set -euo pipefail
 
 REPO="${NIXOS_FLAKE:-$HOME/nixos-wsl}"
 DO_HERDR=1
-DO_HUNK=1
+DO_TUICR=1
 DO_PI=1
 DO_OMP=1
 PI_PKG="${NIXOS_PI_PACKAGE:-@earendil-works/pi-coding-agent}"
@@ -28,10 +28,10 @@ die() { echo "[$LOG_TAG] error: $*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --herdr-only) DO_HUNK=0; DO_PI=0; DO_OMP=0; shift ;;
-    --hunk-only) DO_HERDR=0; DO_PI=0; DO_OMP=0; shift ;;
-    --pi-only) DO_HERDR=0; DO_HUNK=0; DO_OMP=0; shift ;;
-    --omp-only) DO_HERDR=0; DO_HUNK=0; DO_PI=0; shift ;;
+    --herdr-only) DO_TUICR=0; DO_PI=0; DO_OMP=0; shift ;;
+    --tuicr-only) DO_HERDR=0; DO_PI=0; DO_OMP=0; shift ;;
+    --pi-only) DO_HERDR=0; DO_TUICR=0; DO_OMP=0; shift ;;
+    --omp-only) DO_HERDR=0; DO_TUICR=0; DO_PI=0; shift ;;
     --flake-only) DO_PI=0; DO_OMP=0; shift ;;
     -h|--help)
       sed -n '2,16p' "$0" | sed 's/^# \?//'
@@ -46,7 +46,7 @@ cd "$REPO"
 
 changed=0
 herdr_rev=""
-hunk_rev=""
+tuicr_rev=""
 pi_ver=""
 omp_ver=""
 
@@ -58,7 +58,7 @@ lock_rev() {
 }
 
 # ---------------------------------------------------------------------------
-# Flake inputs: herdr + hunk (leave nixpkgs pinned)
+# Flake inputs: herdr + tuicr (leave nixpkgs pinned)
 # ---------------------------------------------------------------------------
 update_flake_input() {
   local name="$1"
@@ -80,9 +80,9 @@ if [[ "$DO_HERDR" -eq 1 ]]; then
   herdr_rev="$(lock_rev herdr)"
 fi
 
-if [[ "$DO_HUNK" -eq 1 ]]; then
-  update_flake_input hunk
-  hunk_rev="$(lock_rev hunk)"
+if [[ "$DO_TUICR" -eq 1 ]]; then
+  update_flake_input tuicr
+  tuicr_rev="$(lock_rev tuicr)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -263,24 +263,24 @@ fi
 # ---------------------------------------------------------------------------
 lock_path="$REPO/agents.lock.json"
 tmp="$(mktemp)"
-existing_pi=""; existing_omp=""; existing_herdr=""; existing_hunk=""
+existing_pi=""; existing_omp=""; existing_herdr=""; existing_tuicr=""
 if [[ -f "$lock_path" ]] && command -v jq >/dev/null; then
   existing_pi="$(jq -r '.pi // empty' "$lock_path" 2>/dev/null || true)"
   existing_omp="$(jq -r '.omp // empty' "$lock_path" 2>/dev/null || true)"
   existing_herdr="$(jq -r '.herdr // empty' "$lock_path" 2>/dev/null || true)"
-  existing_hunk="$(jq -r '.hunk // empty' "$lock_path" 2>/dev/null || true)"
+  existing_tuicr="$(jq -r '.tuicr // empty' "$lock_path" 2>/dev/null || true)"
 fi
 [[ -n "$pi_ver" ]] || pi_ver="$existing_pi"
 [[ -n "$omp_ver" ]] || omp_ver="$existing_omp"
 [[ -n "$herdr_rev" ]] || herdr_rev="$existing_herdr"
-[[ -n "$hunk_rev" ]] || hunk_rev="$existing_hunk"
+[[ -n "$tuicr_rev" ]] || tuicr_rev="$existing_tuicr"
 
 if command -v jq >/dev/null; then
   jq -n \
     --arg pi "${pi_ver}" \
     --arg omp "${omp_ver}" \
     --arg herdr "${herdr_rev}" \
-    --arg hunk "${hunk_rev}" \
+    --arg tuicr "${tuicr_rev}" \
     --arg piPkg "$PI_PKG" \
     --arg ompPkg "$OMP_PKG" \
     --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -292,8 +292,8 @@ if command -v jq >/dev/null; then
       ompPackage: $ompPkg,
       herdr: $herdr,
       herdrInput: "github:ogulcancelik/herdr",
-      hunk: $hunk,
-      hunkInput: "github:modem-dev/hunk",
+      tuicr: $tuicr,
+      tuicrInput: "github:agavra/tuicr",
       updatedAt: $updated,
       updatedOn: $host
     }' >"$tmp"
@@ -306,8 +306,8 @@ else
   "ompPackage": "${OMP_PKG}",
   "herdr": "${herdr_rev}",
   "herdrInput": "github:ogulcancelik/herdr",
-  "hunk": "${hunk_rev}",
-  "hunkInput": "github:modem-dev/hunk",
+  "tuicr": "${tuicr_rev}",
+  "tuicrInput": "github:agavra/tuicr",
   "updatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "updatedOn": "$(hostname 2>/dev/null || echo unknown)"
 }
@@ -322,6 +322,6 @@ else
   rm -f "$tmp"
 fi
 
-log "done changed=$changed pi=${pi_ver:-?} omp=${omp_ver:-?} herdr=${herdr_rev:-?} hunk=${hunk_rev:-?}"
+log "done changed=$changed pi=${pi_ver:-?} omp=${omp_ver:-?} herdr=${herdr_rev:-?} tuicr=${tuicr_rev:-?}"
 echo "$changed" >"$REPO/.agents-changed"
 exit 0

@@ -11,13 +11,12 @@
       pull.rebase = true;
       push.autoSetupRemote = true;
       core.editor = "nvim";
-      # Review-first diffs via hunk (modem-dev/hunk)
-      # https://github.com/modem-dev/hunk — Install / Working with Git
-      core.pager = "hunk pager";
+      # Review-first diffs via tuicr (agavra/tuicr).
+      core.pager = "delta";
       alias = {
-        # Opt-in forms from upstream docs (core.pager already set globally)
-        hdiff = "-c core.pager=\"hunk pager\" diff";
-        hshow = "-c core.pager=\"hunk pager\" show";
+        review = "!tuicr";
+        review-wip = "!tuicr -w";
+        review-pr = "!tuicr pr";
       };
       merge.conflictstyle = "zdiff3";
       rerere.enabled = true;

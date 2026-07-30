@@ -8,9 +8,9 @@
   g = "git";
   lg = "lazygit";
   h = "herdr";
-  hk = "hunk";
-  hdiff = "git hdiff";
-  hshow = "git hshow";
+  tr = "tuicr";
+  trev = "tuicr -w";
+  tpr = "tuicr pr";
   v = "nvim";
   vi = "nvim";
   vim = "nvim";

@@ -23,8 +23,8 @@
     # Agent multiplexer — https://herdr.dev (auto-updated by update-agents.sh)
     herdr.url = "github:ogulcancelik/herdr";
 
-    # Review-first terminal diff viewer — https://github.com/modem-dev/hunk
-    hunk.url = "github:modem-dev/hunk";
+    # Review-first code review TUI — https://github.com/agavra/tuicr
+    tuicr.url = "github:agavra/tuicr";
   };
 
   outputs =
@@ -35,7 +35,7 @@
       home-manager,
       sops-nix,
       herdr,
-      hunk,
+      tuicr,
       ...
     }@inputs:
     let
@@ -51,7 +51,7 @@
           inherit
             inputs
             herdr
-            hunk
+            tuicr
             username
             hostName
             ;

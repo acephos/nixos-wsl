@@ -68,7 +68,7 @@ in
       description = ''
         If true, before each sync run `scripts/update-agents.sh`:
           - herdr: `nix flake update herdr` (system package)
-          - hunk:  `nix flake update hunk`  (system package)
+          - tuicr: `nix flake update tuicr` (system package)
           - omp:   `bun add -g @oh-my-pi/pi-coding-agent@latest` (~/.bun)
           - pi:    `npm i -g @earendil-works/pi-coding-agent@latest` (~/.local)
         nixpkgs / nixos-wsl stay pinned. Records versions in agents.lock.json.

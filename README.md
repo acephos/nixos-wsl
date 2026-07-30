@@ -25,7 +25,7 @@ Windows 11 + WSL2
 | `home-manager` | `release-26.05` | User dotfiles |
 | `sops-nix` | `Mic92/sops-nix` | Encrypted secrets |
 | `herdr` | `ogulcancelik/herdr` | Agent multiplexer (auto-updated) |
-| `hunk` | `modem-dev/hunk` | Terminal diff review UI (auto-updated) |
+| `tuicr` | `agavra/tuicr` | Terminal code review TUI (auto-updated) |
 
 The lockfile is the contract. Two machines on the same `flake.lock` evaluate to
 the same store paths (for a given system, currently `x86_64-linux`).
@@ -150,12 +150,12 @@ nixosWsl.autoSync = {
 };
 ```
 
-**Always-latest agents** (herdr + hunk + omp + pi), base OS stays pinned:
+**Always-latest agents** (herdr + tuicr + omp + pi), base OS stays pinned:
 
 | Tool | Channel | How it updates |
 |------|---------|----------------|
 | `herdr` | flake input | `nix flake update herdr` on each timer / `nup` |
-| `hunk` | flake input | `nix flake update hunk` on each timer / `nup` |
+| `tuicr` | flake input | `nix flake update tuicr` on each timer / `nup` |
 | `omp` | Bun global `@oh-my-pi/pi-coding-agent@latest` → `~/.bun` | `bun add -g …@latest` on each timer / `nup` |
 | `pi` | npm `@latest` → `~/.local` | `npm i -g …@latest` on each timer / `nup` |
 | pi extensions | `home/pi/settings.json` `packages[]` | reconcile install **and** uninstall on each `nup` / 4h tick |
@@ -165,7 +165,7 @@ nixosWsl.autoSync = {
 Versions last resolved are recorded in [`agents.lock.json`](./agents.lock.json).
 
 ```bash
-nup              # update herdr+hunk+omp+pi+extensions, rebuild, push
+nup              # update herdr+tuicr+omp+pi+extensions, rebuild, push
 nup-agents       # update agents + reconcile extensions only
 npi-sync         # commit+push pi settings/extension list now
 nsync-status
@@ -225,7 +225,7 @@ templates/devshell/
 | | |
 |--|--|
 | Backup timer | `nsync-status` — rebuild + push every 4h |
-| Agents | `nup` — herdr + hunk + omp + pi `@latest` + extension reconcile |
+| Agents | `nup` — herdr + tuicr + omp + pi `@latest` + extension reconcile |
 | pi extensions | `packages[]` in `home/pi/settings.json` (install/uninstall synced each tick) |
 | Secrets | `sops secrets/secrets.yaml` → `/run/secrets/*` |
 | CI | GitHub Actions builds `.#nixos` on push |
