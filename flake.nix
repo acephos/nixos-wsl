@@ -3,7 +3,7 @@
 
   inputs = {
     # Pinned exactly. Bump with: nix flake update nixpkgs
-    nixpkgs.url = "github:NixOS/nixpkgs/fd1462031fdee08f65fd0b4c6b64e22239a77870";
+    nixpkgs.url = "github:NixOS/nixpkgs/21ea275a7c46aef9d4d6ddc962e6d562e9d94183";
 
     nixos-wsl = {
       url = "github:nix-community/NixOS-WSL/release-26.05";
@@ -73,8 +73,7 @@
         ];
       };
 
-      packages.${system}.nixos =
-        self.nixosConfigurations.${hostName}.config.system.build.toplevel;
+      packages.${system}.nixos = self.nixosConfigurations.${hostName}.config.system.build.toplevel;
 
       # `nix flake check` / CI
       checks.${system} = {
@@ -91,7 +90,20 @@
             '';
       };
 
-      formatter.${system} = pkgs.nixfmt;
+      formatter.${system} = pkgs.writeShellApplication {
+        name = "format";
+        runtimeInputs = [
+          pkgs.git
+          pkgs.nixfmt
+        ];
+        text = ''
+          if [ "$#" -gt 0 ]; then
+            nixfmt "$@"
+          else
+            git ls-files '*.nix' -z | xargs -0 nixfmt
+          fi
+        '';
+      };
 
       # Templates remain available
       templates = {

@@ -96,10 +96,7 @@ in
         HOME = home;
         NIXOS_NOTIFY_WEBHOOK = cfg.webhookUrl;
         NIXOS_NOTIFY_WEBHOOK_FILE =
-          if (
-            cfg.useSopsSecret
-            && (config.sops.secrets ? "notify-webhook")
-          ) then
+          if (cfg.useSopsSecret && (config.sops.secrets ? "notify-webhook")) then
             config.sops.secrets."notify-webhook".path
           else
             "";
