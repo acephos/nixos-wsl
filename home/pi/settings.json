@@ -1,7 +1,7 @@
 {
   "theme": "dark",
-  "defaultProvider": "xai",
-  "defaultModel": "grok-4.5",
+  "defaultProvider": "openrouter",
+  "defaultModel": "poolside/laguna-s-2.1:free",
   "defaultThinkingLevel": "high",
   "showHardwareCursor": false,
   "terminal": {
@@ -36,5 +36,5 @@
     "npm:pi-web-access",
     "npm:@xaccefy/pi-xpi"
   ],
-  "lastChangelogVersion": "0.82.0"
+  "lastChangelogVersion": "0.83.0"
 }
