@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Periodic job:
 #   1) update fast-moving agents (herdr flake input + pi npm) when enabled
-#   2) rebuild + commit + push known-good
+#   2) rebuild + commit + push immutable build-verified tag
 #
 # Invoked by systemd timer nixos-wsl-auto-sync.timer
 set -euo pipefail
@@ -86,7 +86,6 @@ if [[ "$ONLY_DIRTY" == "1" && "$dirty" == "0" && "$ahead" != "0" ]]; then
   log "local commits not on origin — push only"
   branch="$(git branch --show-current)"
   git push -u origin "$branch"
-  git push origin refs/tags/known-good --force 2>/dev/null || true
   log "push done"
   exit 0
 fi

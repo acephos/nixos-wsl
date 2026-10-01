@@ -1,10 +1,8 @@
 # nixos-wsl
 
-Fully reproducible **NixOS on WSL2** system configuration.
+Pinned **NixOS on WSL2** system configuration for x86_64-linux.
 
-Clone this repo on any machine, rebuild, and you get the **same packages, same
-versions, same shell, same services** — bit-for-bit parity enforced by
-[`flake.lock`](./flake.lock).
+`flake.lock` fixes the declarative system inputs. Agent extensions, Rustup, Android SDK downloads, the WSL base image, credentials and project data have separate mutable lifecycles; the lock alone does not guarantee bit-for-bit workstation parity. [Restore evidence and boundaries](docs/RESTORE_EVIDENCE.md) explain verified build tags, locked CLI installation, and the fresh-distro drill. No new real WSL restore is claimed by this revision.
 
 ```
 Windows 11 + WSL2
@@ -13,7 +11,7 @@ Windows 11 + WSL2
    NixOS-WSL base image
         │
         ▼
-   this flake  ──►  identical system everywhere
+   this flake  ──►  pinned declarative system
 ```
 
 ## What is pinned
@@ -35,7 +33,7 @@ the same store paths (for a given system, currently `x86_64-linux`).
 ### Recommended: one script
 
 **Windows (Admin PowerShell)** — installs WSL2, latest NixOS-WSL base image,
-then applies this repo at tag **`known-good`**:
+then applies this repo at tag **`build-verified`**:
 
 ```powershell
 irm https://raw.githubusercontent.com/acephos/nixos-wsl/main/scripts/install.ps1 | iex
@@ -51,15 +49,15 @@ curl -fsSL https://raw.githubusercontent.com/acephos/nixos-wsl/main/scripts/boot
 
 That will:
 
-1. Install prerequisites (`git`, flakes, …) if missing  
-2. Clone/update `~/nixos-wsl` at **`known-good`** (falls back to `main`)  
-3. `nixos-rebuild switch` your full system from `flake.lock`  
+1. Install prerequisites (`git`, flakes, …) if missing
+2. Clone/update `~/nixos-wsl` at **`build-verified`** (fails closed if missing; explicitly select `--ref main` for a first build)
+3. `nixos-rebuild switch` your full system from `flake.lock`
 4. Print the few human steps left (auth, rustup)
 
 Options:
 
 ```bash
-bash <(curl -fsSL …/bootstrap.sh) --ref known-good   # default
+bash <(curl -fsSL …/bootstrap.sh) --ref build-verified   # default; must exist
 bash <(curl -fsSL …/bootstrap.sh) --ref main
 bash <(curl -fsSL …/bootstrap.sh) --no-rebuild        # fetch only
 bash <(curl -fsSL …/bootstrap.sh) --push              # push after switch
@@ -87,7 +85,7 @@ nsync-status             # 4h backup timer
 2. Inside NixOS:
    ```bash
    git clone https://github.com/acephos/nixos-wsl.git ~/nixos-wsl
-   cd ~/nixos-wsl && git checkout known-good
+   cd ~/nixos-wsl && git checkout build-verified
    ./scripts/install-hooks.sh
    ./scripts/rebuild.sh switch --no-push
    exec zsh
@@ -99,7 +97,7 @@ Repo lives at `~/nixos-wsl` (aliases assume that path).
 
 | Command | What it does |
 |---------|----------------|
-| `nrs` / `rebuild` | switch **and** on success: commit → tag `known-good` → push |
+| `nrs` / `rebuild` | switch **and** on zero exit + matching closure: commit → immutable receipt + `build-verified` → push |
 | `nrt` | test rebuild only (no commit/push) |
 | `nrf` | switch + `--refresh` flake inputs |
 | `nfu` | `nix flake update` then `nrs` |
@@ -127,11 +125,11 @@ source ~/.zshrc       # personal overrides only
 
 ### Git automation (what runs when)
 
-| Event | Commit? | Tag `known-good`? | Push? |
+| Event | Commit? | Verification tag? | Push? |
 |-------|---------|-------------------|-------|
 | `nrs` success | yes, if tree dirty | yes | yes (default) |
-| **timer every 4h** | yes, if dirty | yes | yes |
-| `ngood "before X"` | yes, if dirty | yes | yes |
+| **timer every 4h** | after verified rebuild | only if build/profile match | yes |
+| `ngood "before X"` | yes, if dirty | source-snapshot only | yes |
 | failed rebuild | **no** | **no** | **no** |
 
 #### Periodic timer (default: every 4 hours)
@@ -190,7 +188,7 @@ Other machines: `git pull && nrs` → same closure (from `flake.lock`).
 Rollback map:
 
 - **OS packages/services:** `nroll` or `nlist` + switch-generation
-- **Config files:** `git checkout known-good` (or an older commit) then `nrs`
+- **Config files:** `git checkout build-verified` (or an older commit) then `nrs`
 
 ## Repo layout
 
@@ -271,3 +269,5 @@ go through `--flake ~/nixos-wsl#nixos` (the `nrs` alias).
 ## License
 
 MIT — do whatever. Attribution appreciated but not required.
+
+For a recovery record, use the [fresh-distro drill](docs/RESTORE_EVIDENCE.md#fresh-distro-drill). The `ndrill` command audits readiness; it does not perform restoration. Bootstrap installs locked core CLI versions; intentional latest-agent updates remain available through `nup-agents`.

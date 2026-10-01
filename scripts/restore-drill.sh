@@ -22,7 +22,7 @@ echo
 echo "1) Declarative core"
 [[ -f "$REPO/flake.nix" ]] && pass "flake at $REPO" || bad "missing flake"
 [[ -f "$REPO/flake.lock" ]] && pass "flake.lock present" || bad "missing flake.lock"
-git -C "$REPO" rev-parse known-good >/dev/null 2>&1 && pass "tag known-good exists" || soft "no known-good tag"
+git -C "$REPO" rev-parse build-verified >/dev/null 2>&1 && pass "build-verified tag exists (not proof of restore)" || soft "no verified build tag"
 git -C "$REPO" status --porcelain | grep -q . && soft "git tree dirty — commit before a real drill" || pass "git tree clean"
 command -v nixos-rebuild >/dev/null && pass "nixos-rebuild available" || bad "no nixos-rebuild"
 
@@ -73,31 +73,11 @@ echo " Score: ok=$ok  warn=$warn  fail=$fail"
 echo "════════════════════════════════════════════════════"
 echo
 cat <<'PLAN'
-Full wipe drill (manual — do on a throwaway WSL distro first):
-
-  Windows Admin PowerShell:
-    wsl --export NixOS "$env:USERPROFILE\NixOS-backup.tar"
-    wsl --unregister NixOS-drill   # if reusing name
-    irm https://raw.githubusercontent.com/acephos/nixos-wsl/main/scripts/install.ps1 | iex
-
-  Inside new NixOS (before secrets needed):
-    # restore age key FIRST
-    mkdir -p ~/.config/sops/age
-    # paste keys.txt from password manager
-    chmod 600 ~/.config/sops/age/keys.txt
-
-    curl -fsSL https://raw.githubusercontent.com/acephos/nixos-wsl/main/scripts/bootstrap.sh | bash
-    exec zsh
-    gh auth login && gh auth setup-git
-    rustup default stable
-    # edit git identity in home/default.nix or:
-    git config --global user.name  "..."
-    git config --global user.email "..."
-    nup
-    ndrill          # re-run this audit — aim for fail=0
-
-Target: fail=0, warn only for optional bits, wall clock < 20–30 min
-after WSL image download.
+This command is a read-only readiness audit, not a completed restore drill.
+For a real fresh-distro test, use scripts/restore-drill.ps1 with a recorded
+NixOS-WSL image hash and an explicit Git revision. It refuses an existing distro,
+never unregisters one, and leaves the new test distro for inspection.
+See docs/RESTORE_EVIDENCE.md for procedure and required evidence.
 PLAN
 
 exit "$fail"

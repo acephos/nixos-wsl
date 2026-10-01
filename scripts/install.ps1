@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Install WSL2 + NixOS-WSL, then bootstrap acephos/nixos-wsl at tag known-good.
+  Install WSL2 + NixOS-WSL, then bootstrap acephos/nixos-wsl at tag build-verified.
 
 .DESCRIPTION
   Run from elevated PowerShell on a fresh Windows machine:
@@ -19,7 +19,7 @@
   Git remote for the flake (default: acephos/nixos-wsl)
 
 .PARAMETER Ref
-  Git ref to install (default: known-good)
+  Git ref to install (default: build-verified)
 
 .PARAMETER SkipWslInstall
   Assume WSL is already installed
@@ -31,7 +31,7 @@
 param(
   [string]$DistroName = "NixOS",
   [string]$RepoUrl = "https://github.com/acephos/nixos-wsl.git",
-  [string]$Ref = "known-good",
+  [string]$Ref = "build-verified",
   [string]$InstallDir = "$env:USERPROFILE\NixOS",
   [switch]$SkipWslInstall,
   [switch]$SkipNixOS
@@ -140,10 +140,12 @@ if (-not $SkipNixOS -and -not $distroExists) {
   Write-Step "NixOS distro '$DistroName' already present — skipping image download"
 }
 
-try { wsl --set-default $DistroName } catch { }
+if ($DistroName -eq "NixOS") {
+  try { wsl --set-default $DistroName } catch { }
+}
 
 # ---------------------------------------------------------------------------
-# Bootstrap flake inside the distro (latest known-good)
+# Bootstrap flake inside the distro (latest build-verified)
 # ---------------------------------------------------------------------------
 Write-Step "Bootstrapping flake ($Ref) inside $DistroName"
 
@@ -164,7 +166,7 @@ else
   fi
   cd "\$HOME/nixos-wsl"
   git fetch --tags --force origin || true
-  git checkout -f '$Ref' 2>/dev/null || git checkout -f known-good 2>/dev/null || git checkout -f main
+  # bootstrap resolves the requested ref and refuses dirty checkouts; never force a fallback.
   chmod +x scripts/*.sh
   ./scripts/bootstrap.sh --ref '$Ref' --remote '$RepoUrl' --no-push
 fi
