@@ -1,116 +1,83 @@
 #!/usr/bin/env bash
-# Rebuild this flake, then checkpoint git on success (commit + known-good tag + optional push).
-#
-# Usage:
-#   rebuild.sh [switch|boot|test] [--push|--no-push] [--no-commit] [--] [extra nixos-rebuild args]
-#
-# Env:
-#   NIXOS_FLAKE      repo path          (default: ~/nixos-wsl)
-#   NIXOS_AUTO_PUSH  1/0 auto git push  (default: 1)
-#   NIXOS_AUTO_COMMIT 1/0               (default: 1)
+# Rebuild and tag only a successful, unchanged source revision with matching closure.
+# Usage: rebuild.sh [switch|boot|test] [--push|--no-push] [--no-commit] [--] [extra args]
 set -euo pipefail
-
 REPO="${NIXOS_FLAKE:-$HOME/nixos-wsl}"
-ACTION="switch"
+ACTION=switch
 DO_PUSH="${NIXOS_AUTO_PUSH:-1}"
 DO_COMMIT="${NIXOS_AUTO_COMMIT:-1}"
 EXTRA=()
-
-usage() {
-  sed -n '2,12p' "$0" | sed 's/^# \?//'
-  exit "${1:-0}"
-}
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
     switch|boot|test) ACTION="$1"; shift ;;
-    --push)    DO_PUSH=1; shift ;;
+    --push) DO_PUSH=1; shift ;;
     --no-push) DO_PUSH=0; shift ;;
     --no-commit) DO_COMMIT=0; shift ;;
-    -h|--help) usage 0 ;;
     --) shift; EXTRA+=("$@"); break ;;
+    -h|--help) sed -n '2,3p' "$0"; exit 0 ;;
     *) EXTRA+=("$1"); shift ;;
   esac
 done
-
 cd "$REPO"
-
-if [[ ! -f flake.nix ]]; then
-  echo "error: no flake.nix in $REPO" >&2
+[[ -f flake.nix ]] || { echo 'error: missing flake.nix' >&2; exit 1; }
+# New files must already be staged for Git-backed flake evaluation to include them.
+if [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
+  echo 'error: stage intended new source files before rebuilding (git add <paths>).' >&2
   exit 1
 fi
-
-# Ensure commits work even without a global git identity
-ensure_git_identity() {
-  if ! git config user.email >/dev/null 2>&1; then
-    git config user.email "acephos@users.noreply.github.com"
-    git config user.name  "acephos"
-  fi
+fingerprint() {
+  # Includes tracked/staged changes and modes without displaying file contents.
+  { git rev-parse HEAD; git diff --binary HEAD; git ls-files --stage; } | git hash-object --stdin
 }
-
-echo "==> nixos-rebuild $ACTION --flake $REPO#nixos ${EXTRA[*]:-}"
-# WSL often returns 4 from a harmless user-dbus blip after a successful switch.
+git add -u
+if git diff --cached --name-only --diff-filter=ACM | grep -Eq '(^|/)(\.env(\..*)?|id_rsa|id_ed25519|keys\.txt)$|\.(pem|key)$'; then
+  echo 'error: credential-like staged paths require removal from the index before automated commit/push.' >&2
+  exit 1
+fi
+build_tree="$(git write-tree)"
+before="$(fingerprint)"
 set +e
-sudo nixos-rebuild "$ACTION" --flake "$REPO#nixos" "${EXTRA[@]+"${EXTRA[@]}"}"
+sudo nixos-rebuild "$ACTION" --flake "$REPO#nixos" "${EXTRA[@]}"
 rc=$?
 set -e
-
-if [[ $rc -ne 0 && $rc -ne 4 ]]; then
-  echo "error: rebuild failed (exit $rc) — nothing committed or pushed" >&2
+if [[ "$rc" -ne 0 ]]; then
+  echo "error: rebuild exited $rc; no success tag, commit or push (exit 4 also requires investigation)." >&2
   exit "$rc"
 fi
-if [[ $rc -eq 4 ]]; then
-  echo "note: nixos-rebuild exited 4 (common on WSL user-dbus); system profile looks activated — continuing checkpoint"
-fi
-
-current="$(readlink -f /run/current-system 2>/dev/null || true)"
-gen="$(sudo nix-env --list-generations -p /nix/var/nix/profiles/system 2>/dev/null | awk '/\(current\)/{print $1}')"
-ver="$(nixos-version 2>/dev/null || echo unknown)"
-short="${current##*/}"
-
-echo "==> active generation: ${gen:-?}  ($ver)"
-
-if [[ "$ACTION" != "switch" && "$ACTION" != "boot" ]]; then
-  echo "==> $ACTION rebuild done (no git checkpoint for test)"
+[[ "$(fingerprint)" == "$before" ]] || { echo 'error: source changed during rebuild; no verification tag.' >&2; exit 1; }
+closure="$(nix build "$REPO#nixos" --no-link --print-out-paths)"
+[[ "$closure" == /nix/store/* && "$closure" != *$'\n'* ]] || { echo 'error: expected one system closure.' >&2; exit 1; }
+[[ "$(fingerprint)" == "$before" ]] || { echo 'error: source changed during closure verification.' >&2; exit 1; }
+case "$ACTION" in
+  switch|test) target=/run/current-system ;;
+  boot) target=/nix/var/nix/profiles/system ;;
+esac
+actual="$(readlink -f "$target")"
+[[ "$actual" == "$closure" ]] || { echo 'error: activated/boot profile differs from built closure; no verification tag.' >&2; exit 1; }
+if [[ "$ACTION" == test ]]; then
+  echo "test activation verified: $closure (no commit/tag/push)"
   exit 0
 fi
-
-if [[ "$DO_COMMIT" == "1" ]]; then
-  ensure_git_identity
-  # Include normal tracked changes + untracked (new modules), never secrets-looking junk
-  git add -A -- .
-  # Drop anything that slipped in
-  git reset -q -- .env .env.* *.pem *.key id_rsa id_ed25519 2>/dev/null || true
-
-  if git diff --cached --quiet; then
-    echo "==> git: working tree clean — no new commit"
-  else
-    msg="nixos: gen ${gen:-?} known-good ($ver)"
-    git commit -m "$msg" -m "store: ${short:-unknown}" -m "host: $(hostname) action: $ACTION"
-    echo "==> git: committed → $msg"
+if [[ "$DO_COMMIT" == 1 ]]; then
+  # Stage tracked changes only; caller explicitly stages new files before the build.
+  git add -u
+  if ! git diff --cached --quiet; then
+    git commit -m "nixos: verified $ACTION build" -m "closure: $closure"
   fi
-
-  # Floating tag always points at last successful rebuild of this machine's config
-  git tag -f known-good -m "last successful nixos-rebuild ($ACTION) gen ${gen:-?} on $(hostname)"
-  echo "==> git: tag known-good → $(git rev-parse --short HEAD)"
+elif [[ -n "$(git status --porcelain)" ]]; then
+  echo 'error: --no-commit with dirty source cannot identify a verified revision.' >&2
+  exit 1
 fi
-
-if [[ "$DO_PUSH" == "1" ]]; then
-  if git remote get-url origin >/dev/null 2>&1; then
-    branch="$(git branch --show-current)"
-    echo "==> git: pushing $branch + known-good"
-    # Prefer gh credentials (non-interactive); fall back to plain git
-    if command -v gh >/dev/null 2>&1; then
-      gh auth setup-git >/dev/null 2>&1 || true
-    fi
-    git push -u origin "$branch"
-    # known-good is force-moved on every successful switch
-    git push origin refs/tags/known-good --force
-  else
-    echo "warning: no origin remote — skip push" >&2
-  fi
-else
-  echo "==> git: push skipped (pass --push or NIXOS_AUTO_PUSH=1)"
+# Final equality protects changes during the commit; HEAD now represents the built source.
+[[ -z "$(git status --porcelain)" ]] || { echo 'error: source still dirty; no verification tag.' >&2; exit 1; }
+[[ "$(git rev-parse HEAD^{tree})" == "$build_tree" ]] || { echo "error: committed tree differs from built source." >&2; exit 1; }
+revision="$(git rev-parse HEAD)"
+tag="build-verified-$(date -u +%Y%m%dT%H%M%SZ)-${revision:0:12}"
+git tag -a "$tag" -m "closure=$closure action=$ACTION host=$(hostname) revision=$revision"
+git tag -f -a build-verified -m "closure=$closure action=$ACTION receipt=$tag revision=$revision"
+echo "verified build tag: $tag (build/activation proof; not a completed restore drill)"
+if [[ "$DO_PUSH" == 1 ]] && git remote get-url origin >/dev/null 2>&1; then
+  git push -u origin HEAD
+  git push origin "refs/tags/$tag"
+  git push origin refs/tags/build-verified --force
 fi
-
-echo "==> done"

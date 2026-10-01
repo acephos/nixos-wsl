@@ -22,12 +22,18 @@ DO_OMP=1
 PI_PKG="${NIXOS_PI_PACKAGE:-@earendil-works/pi-coding-agent}"
 OMP_PKG="${NIXOS_OMP_PACKAGE:-@oh-my-pi/pi-coding-agent}"
 LOG_TAG="update-agents"
+LOCKED=0
+PLAN_ONLY=0
+PI_VERSION=latest
+OMP_VERSION=latest
 
 log() { echo "[$LOG_TAG] $*"; }
 die() { echo "[$LOG_TAG] error: $*" >&2; exit 1; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --plan) PLAN_ONLY=1; shift ;;
+    --locked) LOCKED=1; shift ;;
     --herdr-only) DO_TUICR=0; DO_PI=0; DO_OMP=0; shift ;;
     --tuicr-only) DO_HERDR=0; DO_PI=0; DO_OMP=0; shift ;;
     --pi-only) DO_HERDR=0; DO_TUICR=0; DO_OMP=0; shift ;;
@@ -43,6 +49,26 @@ done
 
 cd "$REPO"
 [[ -f flake.nix ]] || die "no flake at $REPO"
+if [[ "$LOCKED" == 1 ]]; then
+  command -v jq >/dev/null || die "jq is required for locked installation"
+  [[ -f agents.lock.json ]] || die "agents.lock.json missing"
+  PI_PKG="$(jq -er '.piPackage' agents.lock.json)"
+  OMP_PKG="$(jq -er '.ompPackage' agents.lock.json)"
+  PI_VERSION="$(jq -er '.pi' agents.lock.json)"
+  OMP_VERSION="$(jq -er '.omp' agents.lock.json)"
+  [[ "$PI_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || die "invalid locked Pi version"
+  [[ "$OMP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || die "invalid locked OMP version"
+  if [[ "$PLAN_ONLY" == 1 ]]; then
+    jq -n --arg pi "$PI_PKG@$PI_VERSION" --arg omp "$OMP_PKG@$OMP_VERSION" \
+      '{mode:"locked",pi:$pi,omp:$omp,flake_update:false,extension_update:false,lock_rewrite:false}'
+    exit 0
+  fi
+  DO_HERDR=0; DO_TUICR=0
+  log "locked core CLI install; extension updates/reconciliation skipped"
+fi
+
+
+[[ "$PLAN_ONLY" == 0 ]] || die "--plan requires --locked"
 
 changed=0
 herdr_rev=""
@@ -187,8 +213,8 @@ if [[ "$DO_PI" -eq 1 ]]; then
     before_pi="$(pi --version 2>/dev/null | head -1 || true)"
   fi
 
-  log "npm install -g ${PI_PKG}@latest  (prefix=$npm_config_prefix)"
-  npm install -g "${PI_PKG}@latest" --no-fund --no-audit
+  log "npm install -g ${PI_PKG}@${PI_VERSION}  (prefix=$npm_config_prefix)"
+  npm install -g "${PI_PKG}@${PI_VERSION}" --no-fund --no-audit
 
   pi_ver="$(npm list -g --depth=0 --prefix "$npm_config_prefix" --json 2>/dev/null \
     | jq -r --arg p "$PI_PKG" '.dependencies[$p].version // empty' 2>/dev/null || true)"
@@ -196,6 +222,7 @@ if [[ "$DO_PI" -eq 1 ]]; then
     pi_ver="$(pi --version 2>/dev/null | head -1 || true)"
   fi
 
+  [[ "$LOCKED" == 0 || "$pi_ver" == "$PI_VERSION" ]] || die "installed Pi version differs from lock"
   after_pi="$(command -v pi >/dev/null && pi --version 2>/dev/null | head -1 || true)"
   if [[ "$before_pi" != "$after_pi" ]]; then
     log "pi updated: ${before_pi:-none} → ${after_pi:-unknown}"
@@ -210,7 +237,7 @@ if [[ "$DO_PI" -eq 1 ]]; then
   esac
 
   # Install + uninstall to match settings.packages (home/pi/settings.json).
-  reconcile_pi_packages
+  [[ "$LOCKED" == 1 ]] || reconcile_pi_packages
 
   # Re-apply local pi-web-access fix (upstream try/catch scope crash on WSL).
   if [[ -x "$REPO/scripts/patch-pi-web-access.sh" ]]; then
@@ -236,9 +263,13 @@ if [[ "$DO_OMP" -eq 1 ]]; then
     before_omp="$(omp --version 2>/dev/null | head -1 || true)"
   fi
 
-  log "bun add -g ${OMP_PKG}@latest  (BUN_INSTALL=$bun_home)"
-  BUN_INSTALL="$bun_home" bun add -g "${OMP_PKG}@latest"
+  log "bun add -g ${OMP_PKG}@${OMP_VERSION}  (BUN_INSTALL=$bun_home)"
+  BUN_INSTALL="$bun_home" bun add -g "${OMP_PKG}@${OMP_VERSION}"
 
+  if [[ "$LOCKED" == 1 ]]; then
+    installed_omp="$(jq -er '.version' "$bun_home/install/global/node_modules/$OMP_PKG/package.json")"
+    [[ "$installed_omp" == "$OMP_VERSION" ]] || die "installed OMP version differs from lock"
+  fi
   bun_global_pkg="$bun_home/install/global/package.json"
   if [[ -f "$bun_global_pkg" ]] && command -v jq >/dev/null; then
     omp_ver="$(jq -r --arg p "$OMP_PKG" '.dependencies[$p] // empty' "$bun_global_pkg" 2>/dev/null || true)"
@@ -261,6 +292,10 @@ fi
 # ---------------------------------------------------------------------------
 # agents.lock.json
 # ---------------------------------------------------------------------------
+if [[ "$LOCKED" == 1 ]]; then
+  log "recorded CLI versions installed; lockfile left unchanged"
+  exit 0
+fi
 lock_path="$REPO/agents.lock.json"
 tmp="$(mktemp)"
 existing_pi=""; existing_omp=""; existing_herdr=""; existing_tuicr=""

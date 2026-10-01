@@ -19,6 +19,9 @@ jobs:
       - name: flake show
         run: nix flake show
 
+      - name: recovery control-flow fixtures
+        run: python3 -m unittest discover -s tests -v
+
       - name: scripts syntax
         run: |
           for s in scripts/*.sh; do
@@ -43,3 +46,17 @@ jobs:
 
       - name: build nixos system closure
         run: nix build .#nixos --print-build-logs
+
+  powershell-syntax:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse installer and restore drill
+        shell: pwsh
+        run: |
+          foreach ($path in @('scripts/install.ps1', 'scripts/restore-drill.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) { throw ($errors | Out-String) }
+          }
