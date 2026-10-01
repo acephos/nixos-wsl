@@ -30,6 +30,10 @@ fingerprint() {
   { git rev-parse HEAD; git diff --binary HEAD; git ls-files --stage; } | git hash-object --stdin
 }
 git add -u
+if git diff --cached --name-only --diff-filter=ACM | grep -Eq '(^|/)(\.env(\..*)?|id_rsa|id_ed25519|keys\.txt)$|\.(pem|key)$'; then
+  echo 'error: credential-like staged paths require removal from the index before automated commit/push.' >&2
+  exit 1
+fi
 build_tree="$(git write-tree)"
 before="$(fingerprint)"
 set +e

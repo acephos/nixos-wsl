@@ -2,7 +2,7 @@
 
 ## Current evidence — 2026-10-01
 
-This revision has six passing recovery-script tests using real temporary Git repositories and fixture system commands. They cover source-only snapshots, nonzero rebuilds including exit 4, mismatched active closures, dirty `--no-commit`, source changes during a build, successful exact-revision receipts, test activation without tags, and locked-version planning. Shell syntax passes. These are control-flow tests, not a Nix build or WSL restore.
+This revision has seven passing recovery-script tests using real temporary Git repositories and fixture system commands. They cover source-only snapshots, nonzero rebuilds including exit 4, mismatched active closures, dirty `--no-commit`, source changes during a build, successful exact-revision receipts, test activation without tags, locked-version planning, and rejection of credential-like staged paths. Shell syntax passes. These are control-flow tests, not a Nix build or WSL restore.
 
 CI builds the pinned NixOS system closure. A successful CI build proves evaluation/build on the Linux runner; it does not prove WSL boot, secret restoration, OAuth compatibility, or workstation recovery. No fresh WSL restore was performed on this Linux workstation. A dated real restore record remains required before claiming recoverability or a recovery-time objective.
 

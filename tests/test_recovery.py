@@ -83,6 +83,12 @@ class RecoveryTests(unittest.TestCase):
         path.write_text(json.dumps(lock))
         self.assertNotEqual(self.run_script('update-agents.sh','--locked','--plan').returncode,0)
 
+    def test_credential_like_staged_paths_block_automation(self):
+        (self.repo/'private.key').write_text('synthetic fixture only')
+        self.git('add','private.key')
+        self.assertNotEqual(self.run_script('rebuild.sh').returncode,0)
+        self.assertEqual(self.git('tag'),'')
+
     def test_test_activation_does_not_tag(self):
         result=self.run_script('rebuild.sh','test')
         self.assertEqual(result.returncode,0,result.stderr)
